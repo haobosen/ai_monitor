@@ -19,7 +19,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window.title = "AI 任务监控"
         window.minSize = NSSize(width: 560, height: 440)
         window.isReleasedWhenClosed = false
-        window.titlebarAppearsTransparent = false
+        // 固定浅色外观：和白色浮窗一致，避免深色模式下又变灰
+        window.appearance = NSAppearance(named: .aqua)
+        window.backgroundColor = .white
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
         window.center()
         window.contentView = NSHostingView(
             rootView: MainView(store: store, onRefresh: onRefresh, onSettings: onSettings)

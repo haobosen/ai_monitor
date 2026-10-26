@@ -1,6 +1,6 @@
 # AI 任务监控（AI Monitor）
 
-macOS 原生小工具：**菜单栏常驻 + 一个只列 AI 的小浮窗 + 一个看完整任务的主界面**。实时查看本机不同 AI 编码助手在跑什么、谁卡在确认、谁失败、谁已经完成。
+macOS 原生小工具：**菜单栏常驻 + 一个只列 AI 的小浮窗 + 一个看完整任务的主界面**。实时查看本机不同 AI 编码助手（Claude Code、Codex、DeepSeek Harness 等）在跑什么、谁卡在确认、谁失败、谁已经完成。
 
 界面完全本地化，不联网、不上传任何数据，只读取各 AI 工具自己写在磁盘上的会话记录。
 
@@ -34,7 +34,7 @@ macOS 原生小工具：**菜单栏常驻 + 一个只列 AI 的小浮窗 + 一�
 
 ## 功能一览
 
-- **监控本机已有的 AI**：自动扫描 Claude Code、Codex，以及 Gemini CLI / Aider / Ollama / Cursor Agent 等命令行工具
+- **监控本机已有的 AI**：自动扫描 Claude Code、Codex、DeepSeek Harness，以及 Gemini CLI / Aider / Ollama / Cursor Agent 等命令行工具
 - **首次启动有初始化流程**：扫描 → 勾选要监控的 AI → 进入小浮窗；之后可在设置里随时增删
 - **四种任务状态**：运行中、需要操作、失败、已完成
 - **完成提示**：屏幕顶部完成提示条 + 系统通知（授权后）+ 主界面绿色横幅 + 浮窗对应 AI 行变绿 + 菜单栏未读计数
@@ -48,6 +48,7 @@ macOS 原生小工具：**菜单栏常驻 + 一个只列 AI 的小浮窗 + 一�
 | --- | --- | --- |
 | **Claude Code**（含 VS Code 扩展 / CLI） | `~/.claude/sessions/*.json` + `~/.claude/projects/**/*.jsonl` | 运行中 / 需要操作 / 已完成 / 失败 |
 | **Codex**（Codex CLI / Codex Desktop） | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | 运行中 / 需要操作 / 已完成 / 失败 |
+| **DeepSeek Harness**（dsh） | `~/.dsh/storages/session_projcache/sessions/session-*.json` | 运行中 / 需要操作 / 已完成 / 失败 |
 | **其他 AI CLI** | 进程列表（`gemini`、`aider`、`ollama run`、`cursor-agent`、`opencode`、`qwen`、`goose`、`crush`、`amp`、`llm`、`sgpt`） | 运行中（进程级） |
 | **桌面应用**（ChatGPT / Claude / Cursor / Windsurf / Ollama） | `/Applications` 安装检测 | 仅提示已安装，不支持任务级状态 |
 
@@ -67,6 +68,15 @@ Codex：
 - `task_complete` → **已完成**
 - `turn_aborted` / `error` → **失败**
 
+DeepSeek Harness（dsh）：
+
+- 当前轮次未结束（`openTurnStartSeq` 有值）且 3 分钟内有进展 → **运行中**
+- 同一轮次超过 3 分钟没有新进展，或存在待你回答的问题 → **需要操作**
+- 轮次正常结束 → **已完成**
+- `llmRetry` / `goal.failure` 有内容 → **失败**
+
+> dsh 的原始会话是 `session.v4.jsonl.zstd` 压缩文件；这里不解压它，而是读 dsh 自己维护的投影缓存（未压缩 JSON），更轻、也不会和 dsh 抢文件锁。
+
 > 「需要操作」是基于会话写入间隔的推断。Claude Code 目前没有把权限弹窗写成独立事件，所以无法做到 100% 精确；这也是多数本地监控工具的通用做法。
 
 ## 安装与运行
@@ -82,7 +92,7 @@ dist/AI Monitor.app
 首次启动会：
 
 1. 自动扫描本机 AI（约 1 秒）
-2. 列出可监控项，默认勾选 Claude Code / Codex
+2. 列出可监控项，默认勾选 Claude Code / Codex / DeepSeek Harness（有数据的才会勾上）
 3. 点「开始监控」后显示小浮窗，并弹出系统通知授权
 
 允许通知后，任务完成时会有系统横幅 + 提示音；如果拒绝授权或系统通知被关闭，顶部的完成提示条、主界面横幅、浮窗高亮和菜单栏计数仍然可用。需要重新开启通知时，到「系统设置 → 通知 → AI 任务监控」里打开即可。
@@ -143,6 +153,7 @@ Sources/AIMonitor/
   Adapters/
     ClaudeAdapter.swift       Claude Code 会话解析
     CodexAdapter.swift        Codex rollout 增量解析
+    DSHAdapter.swift          DeepSeek Harness 会话缓存解析
     CLIAdapter.swift          其他 AI CLI 进程
   PanelController.swift       小型 AI 浮窗
   MainWindowController.swift  主界面窗口
@@ -172,6 +183,7 @@ docs/                         界面预览图
 ## 已知限制
 
 - 只监控**会话记录落盘**的 AI。纯网页版 / 没有本地记录的工具无法读取任务状态。
+- DeepSeek Harness 读的是投影缓存；如果 dsh 刚启动还没写缓存，最多滞后一两秒。
 - Codex 的 `.jsonl.zst` 历史归档不做解析，只读最近的 `.jsonl`。
 - 桌面聊天应用（ChatGPT、Claude 客户端）没有对外暴露任务接口，只能检测是否安装。
 - 状态阈值（3 分钟 / 5 分钟）是按常见使用节奏设定的，可以在适配器里调整。

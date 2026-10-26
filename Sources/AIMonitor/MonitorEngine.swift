@@ -54,6 +54,7 @@ final class MonitorEngine {
         var tasks: [AITask] = []
         if enabledProviders.contains("claude") { tasks += claudeAdapter.scan() }
         if enabledProviders.contains("codex") { tasks += codexAdapter.scan() }
+        if enabledProviders.contains("dsh") { tasks += DSHAdapter.scan() }
 
         let cliMatches = Set(enabledProviders.compactMap { id -> String? in
             id.hasPrefix("cli:") ? String(id.dropFirst(4)) : nil
@@ -86,7 +87,7 @@ final class MonitorEngine {
 
     /// headless 模式（--dump）使用，不启动定时器
     static func scanAll() -> [AITask] {
-        var tasks = ClaudeAdapter().scan() + CodexAdapter().scan()
+        var tasks = ClaudeAdapter().scan() + CodexAdapter().scan() + DSHAdapter.scan()
         let represented = Set(tasks.filter { $0.status.isActive }.map { $0.provider })
         let excludedPIDs = Set(tasks.compactMap { $0.pid })
         let allCLI = Set(ProcessProbe.knownCLI.map { $0.match })

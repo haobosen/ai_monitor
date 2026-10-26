@@ -31,6 +31,7 @@ enum AIProviderCatalog {
         switch id {
         case "claude": return "Claude Code"
         case "codex": return "Codex"
+        case "dsh": return "DeepSeek Harness"
         default:
             if id.hasPrefix("cli:") {
                 let match = String(id.dropFirst(4))
@@ -47,8 +48,9 @@ enum AIProviderCatalog {
     static func sortIndex(for id: String) -> Int {
         if id == "claude" { return 0 }
         if id == "codex" { return 1 }
-        if id.hasPrefix("cli:") { return 2 }
-        return 3
+        if id == "dsh" { return 2 }
+        if id.hasPrefix("cli:") { return 3 }
+        return 4
     }
 
     /// 扫描本机已安装 / 正在运行的 AI 工具
@@ -83,7 +85,22 @@ enum AIProviderCatalog {
             supported: codexAvailable
         ))
 
-        // 3. 其他 AI CLI
+        // 3. DeepSeek Harness（dsh）
+        let dshCache = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(".dsh/storages/session_projcache/sessions")
+        let dshAvailable = FileManager.default.fileExists(atPath: dshCache.path)
+        result.append(DetectedAI(
+            id: "dsh",
+            name: "DeepSeek Harness",
+            detail: dshAvailable
+                ? "读取 ~/.dsh 会话缓存，可识别运行 / 完成 / 等待确认"
+                : "未检测到 ~/.dsh 会话目录",
+            category: .agent,
+            available: dshAvailable,
+            supported: dshAvailable
+        ))
+
+        // 4. 其他 AI CLI
         let runningMatches = Set(
             ProcessProbe.aiCLIProcesses(excluding: []).compactMap { ProcessProbe.match(for: $0)?.match }
         )
@@ -103,7 +120,7 @@ enum AIProviderCatalog {
             ))
         }
 
-        // 4. 桌面应用（只做安装检测，避免造成“能监控任务”的误解）
+        // 5. 桌面应用（只做安装检测，避免造成“能监控任务”的误解）
         let appCandidates: [(String, String, String)] = [
             ("chatgpt", "ChatGPT", "/Applications/ChatGPT.app"),
             ("claude-app", "Claude", "/Applications/Claude.app"),

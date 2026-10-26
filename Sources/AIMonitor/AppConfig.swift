@@ -10,6 +10,7 @@ final class AppConfig: ObservableObject {
         static let enabled = "enabledProviders"
         static let onboarded = "hasOnboarded"
         static let muted = "notificationsMuted"
+        static let dshMigrated = "dshAutoEnabledV1"
     }
 
     private let defaults = UserDefaults.standard
@@ -19,7 +20,7 @@ final class AppConfig: ObservableObject {
     @Published var notificationsMuted: Bool
 
     /// 首次运行默认勾选两个支持任务级监控的 AI
-    static let defaultProviders: Set<String> = ["claude", "codex"]
+    static let defaultProviders: Set<String> = ["claude", "codex", "dsh"]
 
     private init() {
         if let stored = defaults.array(forKey: Key.enabled) as? [String] {
@@ -29,6 +30,17 @@ final class AppConfig: ObservableObject {
         }
         hasOnboarded = defaults.bool(forKey: Key.onboarded)
         notificationsMuted = defaults.bool(forKey: Key.muted)
+
+        // 新增 DeepSeek Harness 支持时，对已初始化的用户自动纳入监控（只做一次）
+        if !defaults.bool(forKey: Key.dshMigrated) {
+            let dshCache = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".dsh/storages/session_projcache/sessions")
+            if FileManager.default.fileExists(atPath: dshCache.path) {
+                enabledProviders.insert("dsh")
+                saveEnabled()
+            }
+            defaults.set(true, forKey: Key.dshMigrated)
+        }
     }
 
     func isEnabled(_ id: String) -> Bool { enabledProviders.contains(id) }

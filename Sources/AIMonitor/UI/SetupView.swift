@@ -20,7 +20,6 @@ final class SetupStore: ObservableObject {
     var onFinish: ((Set<String>) -> Void)?
     var onSkip: (() -> Void)?
     var onToggle: ((String, Bool) -> Void)?
-    var onClose: (() -> Void)?
 
     init(mode: Mode) {
         self.mode = mode
@@ -290,7 +289,7 @@ struct SetupView: View {
             }
 
             Button(isOnboarding ? "开始监控" : "完成") {
-                if isOnboarding { store.finish() } else { store.onClose?() }
+                store.finish()
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)

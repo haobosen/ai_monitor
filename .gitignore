@@ -17,6 +17,7 @@ env/
 # Node
 node_modules/
 dist/
+.build/
 build/
 .next/
 coverage/

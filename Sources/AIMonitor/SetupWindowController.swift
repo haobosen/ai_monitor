@@ -40,6 +40,7 @@ final class SetupWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func present() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)

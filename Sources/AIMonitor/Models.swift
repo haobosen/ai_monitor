@@ -32,7 +32,7 @@ enum TaskStatus: String, Codable, CaseIterable {
         case .running:   return "circle.dotted"
         case .waiting:   return "hand.raised.fill"
         case .failed:    return "exclamationmark.triangle.fill"
-        case .completed: return "checkmark.circle.fill"
+        case .completed: return "checkmark"
         }
     }
 

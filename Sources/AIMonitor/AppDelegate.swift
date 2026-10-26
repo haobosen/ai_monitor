@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        installMainMenu()
         Log.write("应用启动，已启用: \(config.enabledProviders.sorted())")
 
         mainWindowController = MainWindowController(
@@ -284,6 +285,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onUserClose: { [weak self] in
                 guard let self else { return }
                 self.setupWindowController = nil
+                self.refreshActivationPolicy()
                 if !self.config.hasOnboarded {
                     self.config.completeOnboarding(with: self.config.enabledProviders)
                     self.engine.setEnabledProviders(self.config.enabledProviders)
@@ -301,5 +303,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func dismissSetup() {
         setupWindowController?.dismiss()
         setupWindowController = nil
+        refreshActivationPolicy()
+    }
+
+    /// 有普通窗口（主界面 / 设置）时为常规应用，方便 Cmd+Tab；全部关闭后回到菜单栏应用
+    private func refreshActivationPolicy() {
+        DispatchQueue.main.async {
+            let hasTitledWindow = NSApp.windows.contains {
+                $0.isVisible && $0.canBecomeMain
+            }
+            NSApp.setActivationPolicy(hasTitledWindow ? .regular : .accessory)
+        }
+    }
+
+    /// 常规应用状态下的最小主菜单；菜单栏运行时不会显示
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+
+        let appMenu = NSMenu(title: "AI 任务监控")
+        appMenu.addItem(
+            withTitle: "关于 AI 任务监控",
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: ""
+        )
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: "隐藏 AI 任务监控",
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        appMenu.addItem(
+            withTitle: "退出 AI 任务监控",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        appItem.submenu = appMenu
+        NSApp.mainMenu = mainMenu
     }
 }

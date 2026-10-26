@@ -106,14 +106,9 @@ struct CompactRowItem: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .fill(Theme.color(for: summary.color).opacity(isIdle ? 0.10 : 0.18))
-                    .frame(width: 12, height: 12)
-                Circle()
-                    .fill(isIdle ? Color.black.opacity(0.3) : Theme.color(for: summary.color))
-                    .frame(width: 5, height: 5)
-            }
+            Circle()
+                .fill(isIdle ? Color.black.opacity(0.28) : Theme.color(for: summary.color))
+                .frame(width: 7, height: 7)
 
             Text(row.provider)
                 .font(.system(size: 11, weight: .medium))

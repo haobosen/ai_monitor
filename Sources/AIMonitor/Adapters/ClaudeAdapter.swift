@@ -12,6 +12,7 @@ final class ClaudeAdapter {
         case assistantTool
         case toolResult
         case humanPrompt
+        case interrupted
         case error
         case unknown
     }
@@ -114,6 +115,9 @@ final class ClaudeAdapter {
         case .humanPrompt:
             // 用户刚发消息、模型还没写回任何内容
             return idle > 180 ? .waiting : .running
+        case .interrupted:
+            // 用户点了停止 / 按了 Esc，Claude Code 会写入 “[Request interrupted by user]”
+            return .completed
         case .error:
             return .failed
         case .unknown:
@@ -127,6 +131,8 @@ final class ClaudeAdapter {
         if let entrypoint = meta.entrypoint, !entrypoint.isEmpty { parts.append(entrypoint) }
         if !alive {
             parts.append("进程已结束")
+        } else if info.lastKind == .interrupted {
+            parts.append("已手动停止")
         } else if info.lastKind == .assistantTool, idle > 180 {
             parts.append("等待工具确认")
         } else {
@@ -205,6 +211,16 @@ final class ClaudeAdapter {
         return info
     }
 
+    /// 取 user 消息里的纯文本，用来识别 Claude Code 的中断标记
+    private func userText(_ object: [String: Any]) -> String {
+        let message = object["message"] as? [String: Any]
+        if let text = message?["content"] as? String { return text }
+        if let blocks = message?["content"] as? [[String: Any]] {
+            return blocks.compactMap { $0["text"] as? String }.joined(separator: " ")
+        }
+        return ""
+    }
+
     private func parseTail(_ url: URL) -> TailInfo {
         var info = TailInfo()
         let objects = FileTail.tailObjects(at: url, maxBytes: 512 * 1024)
@@ -244,6 +260,10 @@ final class ClaudeAdapter {
             case "user":
                 if object["isApiErrorMessage"] as? Bool == true {
                     info.lastKind = .error
+                    break
+                }
+                if userText(object).range(of: "interrupted by user", options: .caseInsensitive) != nil {
+                    info.lastKind = .interrupted
                     break
                 }
                 let message = object["message"] as? [String: Any]

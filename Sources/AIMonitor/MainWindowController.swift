@@ -41,6 +41,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     var isVisible: Bool { window?.isVisible ?? false }
 
     func show() {
+        // 主界面打开时切成常规应用，这样 Cmd+Tab 和 Dock 里都能找到它
+        NSApp.setActivationPolicy(.regular)
+        Log.write("主界面显示，激活策略 regular（Cmd+Tab 可见）")
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
@@ -49,5 +52,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         onVisibilityChange?(false)
+        DispatchQueue.main.async {
+            // 主界面关掉且没有其他普通窗口时，回到菜单栏应用
+            let hasTitledWindow = NSApp.windows.contains {
+                $0.isVisible && $0.canBecomeMain
+            }
+            if !hasTitledWindow {
+                NSApp.setActivationPolicy(.accessory)
+                Log.write("主界面关闭，激活策略 accessory")
+            }
+        }
     }
 }

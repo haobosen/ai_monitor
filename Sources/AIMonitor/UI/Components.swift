@@ -5,27 +5,39 @@ import AppKit
 
 struct StatusIcon: View {
     let status: TaskStatus
-    @State private var pulsing = false
 
     var body: some View {
-        ZStack {
+        Group {
             if status == .running {
-                Circle()
-                    .fill(Theme.color(for: status).opacity(0.35))
-                    .frame(width: 22, height: 22)
-                    .scaleEffect(pulsing ? 1.55 : 0.85)
-                    .opacity(pulsing ? 0 : 0.9)
-                    .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false), value: pulsing)
+                LoadingRing()
+            } else {
+                Image(systemName: status.symbolName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.color(for: status))
             }
-            Circle()
-                .fill(Theme.color(for: status).opacity(0.16))
-                .frame(width: 22, height: 22)
-            Image(systemName: status.symbolName)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.color(for: status))
         }
         .frame(width: 24, height: 24)
-        .onAppear { pulsing = true }
+    }
+}
+
+/// 运行中的蓝色 loading 环
+struct LoadingRing: View {
+    @State private var rotating = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.10, to: 0.72)
+            .stroke(
+                Theme.running,
+                style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+            )
+            .frame(width: 14, height: 14)
+            .rotationEffect(.degrees(rotating ? 360 : 0))
+            .animation(
+                .linear(duration: 0.9).repeatForever(autoreverses: false),
+                value: rotating
+            )
+            .onAppear { rotating = true }
     }
 }
 

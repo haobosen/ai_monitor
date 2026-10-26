@@ -16,6 +16,9 @@ struct MainView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            Rectangle()
+                .fill(Theme.accent.opacity(0.10))
+                .frame(height: 1)
 
             if let banner = store.banner {
                 CompletionBanner(task: banner, onClose: { store.dismissBanner() })
@@ -50,7 +53,13 @@ struct MainView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color.white.opacity(0.18))
+                    .fill(
+                        LinearGradient(
+                            colors: [Theme.accent, Color(red: 0.62, green: 0.42, blue: 0.98)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 34, height: 34)
                 Image(systemName: "sparkles")
                     .font(.system(size: 16, weight: .semibold))
@@ -60,10 +69,10 @@ struct MainView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("全部任务")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.ink)
                 Text(subtitle)
                     .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.78))
+                    .foregroundStyle(Theme.inkSecondary)
             }
 
             Spacer()
@@ -71,10 +80,10 @@ struct MainView: View {
             Button(action: onRefresh) {
                 Label("刷新", systemImage: "arrow.clockwise")
                     .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.white))
+                    .background(Capsule().fill(Theme.accent))
             }
             .buttonStyle(.plain)
             .keyboardShortcut("r", modifiers: .command)
@@ -82,24 +91,18 @@ struct MainView: View {
             Button(action: onSettings) {
                 Label("设置", systemImage: "gearshape")
                     .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.white.opacity(0.14)))
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 0.8))
+                    .background(Capsule().fill(Color.white))
+                    .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.18), lineWidth: 0.8))
             }
             .buttonStyle(.plain)
             .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-        .background(
-            LinearGradient(
-                colors: [Theme.accent, Color(red: 0.56, green: 0.34, blue: 0.96)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(Color.white)
     }
 
     private var content: some View {

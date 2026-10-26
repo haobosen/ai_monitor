@@ -64,9 +64,12 @@ final class CodexAdapter {
             if status == .completed, Date().timeIntervalSince(updatedAt) > 6 * 3600 { continue }
             if status == .failed, Date().timeIntervalSince(updatedAt) > 12 * 3600 { continue }
 
-            let detailParts = [summary.model, summary.originator]
+            var detailParts = [summary.model, summary.originator]
                 .compactMap { $0 }
                 .filter { !$0.isEmpty }
+            if eventType == "turn_aborted", status == .completed {
+                detailParts.append("已手动停止")
+            }
 
             tasks.append(AITask(
                 id: "codex:\(url.lastPathComponent)",
@@ -89,6 +92,12 @@ final class CodexAdapter {
         case "task_complete":
             return .completed
         case "turn_aborted":
+            // Codex 里用户按 Esc / Ctrl+C 中止，reason 是 interrupted；
+            // 真正出错的中止仍然算失败。
+            let reason = (summary.lastError ?? "").lowercased()
+            if reason.contains("interrupt") || reason.contains("cancel") {
+                return .completed
+            }
             return .failed
         case "error", "stream_error":
             return .failed
@@ -239,7 +248,7 @@ final class CodexAdapter {
             summary.lastTaskAt = timestamp
         case "turn_aborted":
             summary.lastEventType = "turn_aborted"
-            summary.lastError = "任务被中止"
+            summary.lastError = payload?["reason"] as? String ?? "aborted"
             summary.lastTaskAt = timestamp
         case "error", "stream_error":
             summary.lastEventType = "error"

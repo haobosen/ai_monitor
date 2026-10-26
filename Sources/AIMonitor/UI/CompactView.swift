@@ -106,9 +106,20 @@ struct CompactRowItem: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(isIdle ? Color.black.opacity(0.28) : Theme.color(for: summary.color))
-                .frame(width: 7, height: 7)
+            Group {
+                if isIdle {
+                    Circle()
+                        .fill(Color.black.opacity(0.28))
+                        .frame(width: 7, height: 7)
+                } else if summary.color == .running {
+                    LoadingRing(size: 12, lineWidth: 1.8)
+                } else {
+                    Circle()
+                        .fill(Theme.color(for: summary.color))
+                        .frame(width: 7, height: 7)
+                }
+            }
+            .frame(width: 12, height: 12)
 
             Text(row.provider)
                 .font(.system(size: 11, weight: .medium))

@@ -22,6 +22,9 @@ struct StatusIcon: View {
 
 /// 运行中的蓝色 loading 环
 struct LoadingRing: View {
+    var size: CGFloat = 14
+    var lineWidth: CGFloat = 2.2
+
     @State private var rotating = false
 
     var body: some View {
@@ -29,9 +32,9 @@ struct LoadingRing: View {
             .trim(from: 0.10, to: 0.72)
             .stroke(
                 Theme.running,
-                style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
             )
-            .frame(width: 14, height: 14)
+            .frame(width: size, height: size)
             .rotationEffect(.degrees(rotating ? 360 : 0))
             .animation(
                 .linear(duration: 0.9).repeatForever(autoreverses: false),

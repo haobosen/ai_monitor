@@ -92,6 +92,7 @@ final class PanelController {
         refreshLayout()
         panel.orderFrontRegardless()
         clampToScreen()
+        Log.write("浮窗显示: \(Int(panel.frame.width))x\(Int(panel.frame.height))")
         onVisibilityChange?(true)
     }
 

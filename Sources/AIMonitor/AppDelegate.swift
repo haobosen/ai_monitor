@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let engine = MonitorEngine()
     private let notifier = TaskNotifier()
     private let store = TaskStore()
+    private let toastController = CompletionToastController()
 
     private var panelController: PanelController!
     private var mainWindowController: MainWindowController!
@@ -76,6 +77,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for task in newlyCompleted {
                 self.store.showCompletion(task)
                 self.store.highlight(provider: task.provider)
+                if !self.isSnapshotMode, !self.mainWindowController.isVisible {
+                    self.toastController.show(task: task, muted: self.config.notificationsMuted) { [weak self] in
+                        self?.openMain()
+                    }
+                }
             }
             if !newlyCompleted.isEmpty {
                 if self.panelController.isVisible || self.mainWindowController.isVisible {
@@ -98,6 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 调试：启动后直接打开主界面
         if CommandLine.arguments.contains("--main") {
             openMain()
+        }
+
+        // 调试：展示完成提示条
+        if CommandLine.arguments.contains("--test-toast") {
+            toastController.show(task: Self.demoTasks()[0], muted: true) {}
         }
 
         if isSnapshotMode {
@@ -154,6 +165,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             to: directory.appendingPathComponent("compact-demo.png")
         )
         report.append("compact-demo:\(demoOK) rows=\(demoRows.count)")
+
+        let toastOK = SnapshotRenderer.capture(
+            ToastView(task: demoTasks[0], onOpen: {}, onClose: {}),
+            size: NSSize(width: 340, height: 116),
+            background: .clear,
+            to: directory.appendingPathComponent("toast-demo.png")
+        )
+        report.append("toast-demo:\(toastOK)")
 
         let mainOK = SnapshotRenderer.capture(
             MainView(store: demoStore, onRefresh: {}, onSettings: {}),

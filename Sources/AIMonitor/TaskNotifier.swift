@@ -12,6 +12,9 @@ final class TaskNotifier: NSObject, UNUserNotificationCenterDelegate {
     func requestAuthorization() {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        center.getNotificationSettings { settings in
+            Log.write("通知权限状态: \(settings.authorizationStatus.rawValue) (0=未决定 1=拒绝 2=允许 3=临时)")
+        }
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 Log.write("通知授权失败: \(error.localizedDescription)")

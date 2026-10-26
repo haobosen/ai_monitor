@@ -23,6 +23,7 @@ final class PanelController {
 
     var onVisibilityChange: ((Bool) -> Void)?
     var isVisible: Bool { panel.isVisible }
+    var frame: NSRect { panel.frame }
 
     init(store: TaskStore, onOpenMain: @escaping (String?) -> Void) {
         self.store = store

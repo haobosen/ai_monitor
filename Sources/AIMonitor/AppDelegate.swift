@@ -62,6 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         notifier.isMuted = config.notificationsMuted
 
+        toastController.panelFrameProvider = { [weak self] in
+            guard let self, self.panelController.isVisible else { return nil }
+            return self.panelController.frame
+        }
+
         if CommandLine.arguments.contains("--dump-menu") {
             print(menuBarController.debugItemTitles().joined(separator: "\n"))
             NSApp.terminate(nil)

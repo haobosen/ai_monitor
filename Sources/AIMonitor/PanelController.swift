@@ -15,8 +15,10 @@ final class PanelController {
     private let actions: PanelActions
 
     private var dragStartOrigin: NSPoint?
+    private var dragStartMouse: NSPoint?
     private var hasRestoredFrame = false
     private var cancellables = Set<AnyCancellable>()
+    private var dragObserver: NSObjectProtocol?
     private let frameKey = "panelFrame"
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -57,18 +59,26 @@ final class PanelController {
         actions.openMain = onOpenMain
         actions.hide = { [weak self] in self?.hide() }
         actions.dragBegan = { [weak self] in
-            self?.dragStartOrigin = self?.panel.frame.origin
+            guard let self else { return }
+            self.dragStartOrigin = self.panel.frame.origin
+            self.dragStartMouse = NSEvent.mouseLocation
         }
-        actions.dragChanged = { [weak self] translation in
-            guard let self, let start = self.dragStartOrigin else { return }
+        actions.dragChanged = { [weak self] _ in
+            // 用屏幕坐标计算位移：SwiftUI 的 translation 会随窗口移动而变化，
+            // 直接使用会导致窗口跟不上鼠标。
+            guard let self,
+                  let origin = self.dragStartOrigin,
+                  let startMouse = self.dragStartMouse else { return }
+            let current = NSEvent.mouseLocation
             self.panel.setFrameOrigin(NSPoint(
-                x: start.x + translation.width,
-                y: start.y - translation.height
+                x: origin.x + current.x - startMouse.x,
+                y: origin.y + current.y - startMouse.y
             ))
         }
         actions.dragEnded = { [weak self] in
             guard let self else { return }
             self.dragStartOrigin = nil
+            self.dragStartMouse = nil
             self.clampToScreen()
             self.saveFrame()
         }
@@ -80,6 +90,16 @@ final class PanelController {
         restoreFrame()
         bindLayoutChanges()
         refreshLayout()
+
+        dragObserver = NotificationCenter.default.addObserver(
+            forName: .panelDragEnded,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.clampToScreen()
+            self.saveFrame()
+        }
     }
 
     // MARK: - 显示 / 隐藏

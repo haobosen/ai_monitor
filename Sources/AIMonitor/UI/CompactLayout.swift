@@ -32,7 +32,7 @@ enum CompactRows {
 enum CompactLayout {
     static let cardWidth: CGFloat = 200
     static let rowHeight: CGFloat = 26
-    static let headerHeight: CGFloat = 22
+    static let headerHeight: CGFloat = 24
     static let verticalPadding: CGFloat = 5
     static let shadowPadding: CGFloat = 8
 

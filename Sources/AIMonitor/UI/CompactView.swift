@@ -43,10 +43,18 @@ struct CompactView: View {
 
     private var header: some View {
         HStack(spacing: 5) {
-            Text("AI 任务监控")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 2)
+            HStack(spacing: 5) {
+                Image(systemName: "circle.grid.2x2.fill")
+                    .font(.system(size: 6.5))
+                    .foregroundStyle(.tertiary)
+                Text("AI 任务监控")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .overlay(WindowDragHandle())
+            .gesture(headerDragGesture)
 
             Button { actions.openMain(nil) } label: {
                 Image(systemName: "arrow.up.right.square")
@@ -68,8 +76,6 @@ struct CompactView: View {
         }
         .padding(.horizontal, 9)
         .frame(height: CompactLayout.headerHeight)
-        .contentShape(Rectangle())
-        .gesture(headerDragGesture)
     }
 
     private var emptyRow: some View {
@@ -187,4 +193,33 @@ struct CompactRowItem: View {
         if hovering { return Color.primary.opacity(0.06) }
         return .clear
     }
+}
+
+
+// MARK: - 标题栏拖动区域（AppKit）
+
+/// 用 NSView + performDrag 实现窗口拖动，避免 SwiftUI 手势随窗口移动而失效
+private struct WindowDragHandle: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { DragView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class DragView: NSView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override var mouseDownCanMoveWindow: Bool { true }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            Log.write("拖动浮窗")
+            window?.performDrag(with: event)
+            NotificationCenter.default.post(name: .panelDragEnded, object: nil)
+        }
+    }
+}
+
+
+extension Notification.Name {
+    static let panelDragEnded = Notification.Name("AIMonitorPanelDragEnded")
 }

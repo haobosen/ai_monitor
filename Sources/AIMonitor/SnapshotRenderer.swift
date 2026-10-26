@@ -18,7 +18,7 @@ enum SnapshotRenderer {
     }
 
     @discardableResult
-    static func capture<V: View>(_ view: V, size: NSSize, to url: URL) -> Bool {
+    static func capture<V: View>(_ view: V, size: NSSize, background: NSColor = .windowBackgroundColor, to url: URL) -> Bool {
         let hosting = NSHostingView(rootView: view)
         hosting.frame = NSRect(origin: .zero, size: size)
 
@@ -29,8 +29,8 @@ enum SnapshotRenderer {
             defer: false
         )
         window.contentView = hosting
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = true
+        window.backgroundColor = background
+        window.isOpaque = background.alphaComponent >= 1
         window.orderFrontRegardless()
         hosting.layoutSubtreeIfNeeded()
 

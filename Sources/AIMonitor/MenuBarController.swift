@@ -4,6 +4,7 @@ import AppKit
 final class MenuBarController: NSObject, NSMenuDelegate {
 
     struct Actions {
+        var openMain: () -> Void = {}
         var togglePanel: () -> Void = {}
         var isPanelVisible: () -> Bool = { false }
         var openSettings: () -> Void = {}
@@ -98,6 +99,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+        let mainItem = NSMenuItem(title: "打开主界面", action: #selector(handleOpenMain), keyEquivalent: "o")
+        mainItem.target = self
+        menu.addItem(mainItem)
+
         let toggleTitle = actions.isPanelVisible() ? "隐藏浮窗" : "显示浮窗"
         let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(handleTogglePanel), keyEquivalent: "")
         toggleItem.target = self
@@ -123,8 +128,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(quitItem)
     }
 
+    /// 调试用：返回当前菜单项标题
+    func debugItemTitles() -> [String] {
+        menuNeedsUpdate(menu)
+        return menu.items.map { $0.isSeparatorItem ? "---" : $0.title }
+    }
+
     // MARK: - 动作
 
+    @objc private func handleOpenMain() { actions.openMain() }
     @objc private func handleTogglePanel() { actions.togglePanel() }
     @objc private func handleRefresh() { actions.refresh() }
     @objc private func handleToggleMute() { actions.toggleMute() }

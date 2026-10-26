@@ -26,6 +26,31 @@ struct DetectedAI: Identifiable, Equatable {
 
 enum AIProviderCatalog {
 
+    /// 把配置里的 provider id 映射成展示名（与 AITask.provider 保持一致）
+    static func displayName(for id: String) -> String {
+        switch id {
+        case "claude": return "Claude Code"
+        case "codex": return "Codex"
+        default:
+            if id.hasPrefix("cli:") {
+                let match = String(id.dropFirst(4))
+                return ProcessProbe.knownCLI.first(where: { $0.match == match })?.provider ?? match.capitalized
+            }
+            if id.hasPrefix("app:") {
+                return String(id.dropFirst(4))
+            }
+            return id
+        }
+    }
+
+    /// 浮窗里的固定顺序：Claude Code、Codex，然后其他 CLI
+    static func sortIndex(for id: String) -> Int {
+        if id == "claude" { return 0 }
+        if id == "codex" { return 1 }
+        if id.hasPrefix("cli:") { return 2 }
+        return 3
+    }
+
     /// 扫描本机已安装 / 正在运行的 AI 工具
     static func discover() -> [DetectedAI] {
         var result: [DetectedAI] = []

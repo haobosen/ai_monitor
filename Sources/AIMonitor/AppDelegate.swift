@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = TaskStore()
 
     private var panelController: PanelController!
+    private var mainWindowController: MainWindowController!
     private var menuBarController: MenuBarController!
     private var setupWindowController: SetupWindowController?
 
@@ -17,10 +18,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         Log.write("应用启动，已启用: \(config.enabledProviders.sorted())")
 
-        panelController = PanelController(
+        mainWindowController = MainWindowController(
             store: store,
             onRefresh: { [weak self] in self?.engine.refresh() },
             onSettings: { [weak self] in self?.presentSetup(mode: .settings) }
+        )
+        mainWindowController.onVisibilityChange = { [weak self] visible in
+            guard let self, visible else { return }
+            self.store.clearUnread()
+            self.menuBarController?.refreshIcon()
+            Log.write("主界面可见性: \(visible)")
+        }
+
+        panelController = PanelController(
+            store: store,
+            onOpenMain: { [weak self] _ in self?.openMain() }
         )
         panelController.onVisibilityChange = { [weak self] visible in
             guard let self else { return }
@@ -32,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menuBarController = MenuBarController(store: store, actions: MenuBarController.Actions(
+            openMain: { [weak self] in self?.openMain() },
             togglePanel: { [weak self] in self?.panelController.toggle() },
             isPanelVisible: { [weak self] in self?.panelController.isVisible ?? false },
             openSettings: { [weak self] in self?.presentSetup(mode: .settings) },
@@ -43,10 +56,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             isMuted: { [weak self] in self?.config.notificationsMuted ?? false },
             quit: { NSApp.terminate(nil) },
-            selectTask: { [weak self] _ in self?.panelController.show() }
+            selectTask: { [weak self] _ in self?.openMain() }
         ))
 
         notifier.isMuted = config.notificationsMuted
+
+        if CommandLine.arguments.contains("--dump-menu") {
+            print(menuBarController.debugItemTitles().joined(separator: "\n"))
+            NSApp.terminate(nil)
+            return
+        }
 
         engine.onUpdate = { [weak self] tasks in
             guard let self else { return }
@@ -56,9 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let newlyCompleted = self.notifier.process(tasks)
             for task in newlyCompleted {
                 self.store.showCompletion(task)
+                self.store.highlight(provider: task.provider)
             }
-            if !newlyCompleted.isEmpty, self.panelController.isVisible {
-                self.store.clearUnread()
+            if !newlyCompleted.isEmpty {
+                if self.panelController.isVisible || self.mainWindowController.isVisible {
+                    self.store.clearUnread()
+                }
                 self.menuBarController.refreshIcon()
             }
         }
@@ -71,6 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panelController.show()
         } else {
             presentSetup(mode: .onboarding)
+        }
+
+        // 调试：启动后直接打开主界面
+        if CommandLine.arguments.contains("--main") {
+            openMain()
         }
 
         if isSnapshotMode {
@@ -104,27 +131,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let realStore = TaskStore()
         realStore.apply(store.tasks.isEmpty ? MonitorEngine.scanAll() : store.tasks)
-        let size = NSSize(
-            width: Theme.panelWidth + Theme.outerMargin * 2,
-            height: Theme.panelHeight + Theme.outerMargin * 2
-        )
+        let realRows = CompactRows.models(tasks: realStore.tasks, enabled: AppConfig.shared.enabledProviders)
+        let compactSize = CompactLayout.panelSize(rows: realRows.count)
         let realOK = SnapshotRenderer.capture(
-            RootView(store: realStore, actions: PanelActions()),
-            size: size,
-            to: directory.appendingPathComponent("panel-real.png")
+            CompactView(store: realStore, actions: PanelActions()),
+            size: compactSize,
+            background: .clear,
+            to: directory.appendingPathComponent("compact-real.png")
         )
-        report.append("panel-real:\(realOK) tasks=\(realStore.tasks.count)")
+        report.append("compact-real:\(realOK) rows=\(realRows.count) tasks=\(realStore.tasks.count)")
 
         let demoStore = TaskStore()
         let demoTasks = Self.demoTasks()
         demoStore.apply(demoTasks)
         demoStore.showCompletion(demoTasks[0])
+        demoStore.highlight(provider: "Claude Code")
+        let demoRows = CompactRows.models(tasks: demoStore.tasks, enabled: AppConfig.shared.enabledProviders)
         let demoOK = SnapshotRenderer.capture(
-            RootView(store: demoStore, actions: PanelActions()),
-            size: size,
-            to: directory.appendingPathComponent("panel-demo.png")
+            CompactView(store: demoStore, actions: PanelActions()),
+            size: CompactLayout.panelSize(rows: demoRows.count),
+            background: .clear,
+            to: directory.appendingPathComponent("compact-demo.png")
         )
-        report.append("panel-demo:\(demoOK)")
+        report.append("compact-demo:\(demoOK) rows=\(demoRows.count)")
+
+        let mainOK = SnapshotRenderer.capture(
+            MainView(store: demoStore, onRefresh: {}, onSettings: {}),
+            size: NSSize(width: 720, height: 600),
+            to: directory.appendingPathComponent("main-demo.png")
+        )
+        report.append("main-demo:\(mainOK)")
 
         Log.write("snapshot: " + report.joined(separator: " | "))
         NSApp.terminate(nil)
@@ -169,7 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
     }
 
-    // MARK: - 初始化 / 设置
+    // MARK: - 主界面 / 设置
+
+    private func openMain() {
+        mainWindowController.show()
+        store.clearUnread()
+        menuBarController?.refreshIcon()
+    }
 
     private func presentSetup(mode: SetupStore.Mode) {
         if let existing = setupWindowController {

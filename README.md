@@ -1,24 +1,44 @@
 # AI 任务监控（AI Monitor）
 
-macOS 原生浮窗 + 菜单栏小工具，实时查看本机不同 AI 编码助手正在执行的任务：谁在跑、谁卡在确认、谁失败、谁已经完成。
+macOS 原生小工具：**菜单栏常驻 + 一个只列 AI 的小浮窗 + 一个看完整任务的主界面**。实时查看本机不同 AI 编码助手在跑什么、谁卡在确认、谁失败、谁已经完成。
 
 界面完全本地化，不联网、不上传任何数据，只读取各 AI 工具自己写在磁盘上的会话记录。
 
-![任务浮窗](docs/preview-panel.png)
+![主界面](docs/preview-main.png)
 
-## 功能一览
+## 两个界面
 
-- **监控本机已有的 AI**：自动扫描 Claude Code、Codex，以及 Gemini CLI / Aider / Ollama / Cursor Agent 等命令行工具
-- **首次启动有初始化流程**：扫描 → 勾选要监控的 AI → 进入浮窗；之后可在设置里随时增删
-- **四种任务状态**：运行中、需要操作、失败、已完成
-- **浮窗可拖动**：常驻置顶，可跨桌面空间显示；拖动标题区域即可移动，位置会记住
-- **完成提示足够明显**：系统通知 + 浮窗顶部绿色横幅 + 菜单栏图标上的未完成计数
-- **菜单栏图标下拉菜单**：按 AI 分组列出所有任务，可显示/隐藏浮窗、立即刷新、静音通知、打开设置、退出
-- **关闭浮窗不退出**：点浮窗右上角 × 只是收起，菜单栏继续运行
+### 小浮窗（默认显示）
+
+![小浮窗](docs/preview-panel.png)
+
+- **只列 AI，不显示具体任务**：每个 AI 一行，右侧是状态摘要（运行 / 待操作 / 失败 / 已完成 / 空闲）
+- 尺寸很小（约 200pt 宽），AI 越多高度才会略微增加，不会占屏幕
+- 拖动任意一行或顶部标题即可移动，位置会记住
+- **点击任意一行打开主界面**；点右上角 × 只是收起浮窗
+- 有任务完成时，对应 AI 的那一行会短暂变绿，不弹大横幅
+
+### 主界面
+
+- 完整任务列表：按 AI 分组，显示任务标题、项目、状态、最后活跃时间
+- 顶部统计四种状态的数量；任务完成时出现绿色横幅
+- 「刷新」「设置」按钮，支持 `⌘R` / `⌘,`
+- 关闭主窗口不会退出，菜单栏和浮窗继续运行
+
+入口：菜单栏 ✨ → **打开主界面**，或直接点浮窗里的任意 AI。
 
 | 初始化 | 设置 |
 | --- | --- |
 | ![初始化](docs/preview-onboarding.png) | ![设置](docs/preview-settings.png) |
+
+## 功能一览
+
+- **监控本机已有的 AI**：自动扫描 Claude Code、Codex，以及 Gemini CLI / Aider / Ollama / Cursor Agent 等命令行工具
+- **首次启动有初始化流程**：扫描 → 勾选要监控的 AI → 进入小浮窗；之后可在设置里随时增删
+- **四种任务状态**：运行中、需要操作、失败、已完成
+- **完成提示**：系统通知 + 主界面绿色横幅 + 浮窗对应 AI 行变绿 + 菜单栏未读计数
+- **菜单栏图标下拉菜单**：打开主界面、按 AI 分组列出任务、显示/隐藏浮窗、刷新、静音、设置、退出
+- **关闭窗口不退出**：浮窗或主界面关掉后，应用仍在菜单栏运行
 
 ## 支持监控哪些 AI
 
@@ -61,23 +81,22 @@ dist/AI Monitor.app
 
 1. 自动扫描本机 AI（约 1 秒）
 2. 列出可监控项，默认勾选 Claude Code / Codex
-3. 点「开始监控」后显示浮窗，并弹出系统通知授权
+3. 点「开始监控」后显示小浮窗，并弹出系统通知授权
 
-允许通知后，任务完成时会有系统横幅 + 提示音；如果拒绝授权，浮窗内横幅和菜单栏计数仍然可用。
+允许通知后，任务完成时会有系统横幅 + 提示音；如果拒绝授权，主界面横幅、浮窗高亮和菜单栏计数仍然可用。
 
 ## 菜单栏
 
 点击菜单栏的 ✨ 图标：
 
 - 顶部显示当前进行中的任务数
-- 按 AI 分组列出每个任务（状态用 🟠🔵🔴🟢 标识），点击任意任务会展开浮窗
+- 按 AI 分组列出每个任务，点击任意任务会打开主界面
+- **打开主界面**
 - **显示浮窗 / 隐藏浮窗**
 - **立即刷新**
 - **静音通知**
 - **设置…**
 - **退出 AI Monitor**
-
-浮窗里点击右上角齿轮也能直接打开设置。
 
 ## 开发与构建
 
@@ -103,6 +122,7 @@ BIN="dist/AI Monitor.app/Contents/MacOS/AIMonitor"
 "$BIN" --dump              # 以 JSON 打印当前任务，便于排查适配器
 "$BIN" --reset-config      # 清空配置（下次启动重新走初始化）
 "$BIN" --mark-onboarded    # 跳过初始化，直接进浮窗
+"$BIN" --main              # 启动后直接打开主界面
 "$BIN" --snapshot <dir>    # 离屏渲染界面截图（不需要录屏权限）
 "$BIN" --settings --snapshot <dir>   # 截图设置页
 ```
@@ -122,10 +142,17 @@ Sources/AIMonitor/
     ClaudeAdapter.swift       Claude Code 会话解析
     CodexAdapter.swift        Codex rollout 增量解析
     CLIAdapter.swift          其他 AI CLI 进程
-  PanelController.swift       可拖动置顶浮窗
+  PanelController.swift       小型 AI 浮窗
+  MainWindowController.swift  主界面窗口
   MenuBarController.swift     菜单栏图标与下拉菜单
   TaskNotifier.swift          系统通知 + 完成回调
-  UI/                         SwiftUI 界面
+  UI/
+    CompactView.swift         浮窗界面（只列 AI）
+    MainView.swift            主界面（完整任务列表）
+    TaskStore.swift           任务状态仓库
+    Components.swift          状态点、任务行、横幅等
+    SetupView.swift           初始化 / 设置
+  SnapshotRenderer.swift      离屏截图（调试）
 Resources/Info.plist          应用元信息（LSUIElement，无 Dock 图标）
 build.sh                      构建脚本
 docs/                         界面预览图

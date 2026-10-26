@@ -3,8 +3,59 @@ import SwiftUI
 import Combine
 
 final class FloatingPanel: NSPanel {
+    private var dragOrigin: NSPoint?
+    private var dragStartMouse: NSPoint?
+    private var isWindowDragging = false
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// 整个浮窗都能拖：在窗口层处理鼠标，不再让 SwiftUI 手势和窗口移动互相打架
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            dragOrigin = frame.origin
+            dragStartMouse = NSEvent.mouseLocation
+            isWindowDragging = false
+            super.sendEvent(event)
+
+        case .leftMouseDragged:
+            guard let origin = dragOrigin, let start = dragStartMouse else {
+                super.sendEvent(event)
+                return
+            }
+            let current = NSEvent.mouseLocation
+            let dx = current.x - start.x
+            let dy = current.y - start.y
+
+            if !isWindowDragging, hypot(dx, dy) > 3 {
+                isWindowDragging = true
+                Log.write("拖动浮窗")
+            }
+
+            if isWindowDragging {
+                setFrameOrigin(NSPoint(x: origin.x + dx, y: origin.y + dy))
+            } else {
+                super.sendEvent(event)
+            }
+
+        case .leftMouseUp:
+            if isWindowDragging {
+                isWindowDragging = false
+                dragOrigin = nil
+                dragStartMouse = nil
+                // 不转发 up，避免拖动结束后又触发一次点击
+                NotificationCenter.default.post(name: .panelDragEnded, object: nil)
+            } else {
+                dragOrigin = nil
+                dragStartMouse = nil
+                super.sendEvent(event)
+            }
+
+        default:
+            super.sendEvent(event)
+        }
+    }
 }
 
 /// 小型浮窗：只列出 AI，点击打开主界面
@@ -14,8 +65,6 @@ final class PanelController {
     private let store: TaskStore
     private let actions: PanelActions
 
-    private var dragStartOrigin: NSPoint?
-    private var dragStartMouse: NSPoint?
     private var hasRestoredFrame = false
     private var cancellables = Set<AnyCancellable>()
     private var dragObserver: NSObjectProtocol?
@@ -59,30 +108,6 @@ final class PanelController {
 
         actions.openMain = onOpenMain
         actions.hide = { [weak self] in self?.hide() }
-        actions.dragBegan = { [weak self] in
-            guard let self else { return }
-            self.dragStartOrigin = self.panel.frame.origin
-            self.dragStartMouse = NSEvent.mouseLocation
-        }
-        actions.dragChanged = { [weak self] _ in
-            // 用屏幕坐标计算位移：SwiftUI 的 translation 会随窗口移动而变化，
-            // 直接使用会导致窗口跟不上鼠标。
-            guard let self,
-                  let origin = self.dragStartOrigin,
-                  let startMouse = self.dragStartMouse else { return }
-            let current = NSEvent.mouseLocation
-            self.panel.setFrameOrigin(NSPoint(
-                x: origin.x + current.x - startMouse.x,
-                y: origin.y + current.y - startMouse.y
-            ))
-        }
-        actions.dragEnded = { [weak self] in
-            guard let self else { return }
-            self.dragStartOrigin = nil
-            self.dragStartMouse = nil
-            self.clampToScreen()
-            self.saveFrame()
-        }
 
         let hosting = NSHostingView(rootView: CompactView(store: store, actions: actions))
         hosting.frame = NSRect(origin: .zero, size: size)
@@ -204,4 +229,9 @@ final class PanelController {
         origin.y = max(origin.y, visible.minY - size.height + minVisible)
         panel.setFrameOrigin(origin)
     }
+}
+
+
+extension Notification.Name {
+    static let panelDragEnded = Notification.Name("AIMonitorPanelDragEnded")
 }

@@ -21,14 +21,15 @@ struct ToastView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(task.provider) · 任务完成")
                     .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.85))
                 Text(task.title)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black.opacity(0.55))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(task.projectName)
                     .font(.system(size: 9.5))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.black.opacity(0.4))
                     .lineLimit(1)
             }
 
@@ -37,18 +38,18 @@ struct ToastView: View {
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.black.opacity(0.4))
                     .frame(width: 16, height: 16)
             }
             .buttonStyle(.plain)
         }
         .padding(12)
         .frame(width: 320, alignment: .leading)
-        .background(VisualEffectBackground(material: .hudWindow, blending: .behindWindow))
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.7)
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.7)
         )
         .padding(10)
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)

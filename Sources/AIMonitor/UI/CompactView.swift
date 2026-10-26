@@ -7,9 +7,6 @@ struct CompactView: View {
     @ObservedObject var actions: PanelActions
     @ObservedObject private var config = AppConfig.shared
 
-    @State private var isDragging = false
-    @State private var dragMoved = false
-
     private var rows: [CompactRowModel] {
         CompactRows.models(tasks: store.tasks, enabled: config.enabledProviders)
     }
@@ -26,16 +23,16 @@ struct CompactView: View {
                         highlighted: store.highlightedProvider == row.provider
                     )
                     .contentShape(Rectangle())
-                    .gesture(rowGesture(for: row))
+                    .onTapGesture { actions.openMain(row.provider) }
                 }
             }
         }
         .frame(width: CompactLayout.cardWidth, height: CompactLayout.cardHeight(rows: rows.count))
-        .background(VisualEffectBackground(material: .popover, blending: .behindWindow))
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.7)
+                .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.7)
         )
         .padding(CompactLayout.shadowPadding)
         .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
@@ -46,20 +43,18 @@ struct CompactView: View {
             HStack(spacing: 5) {
                 Image(systemName: "circle.grid.2x2.fill")
                     .font(.system(size: 6.5))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.black.opacity(0.32))
                 Text("AI 任务监控")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black.opacity(0.55))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .overlay(WindowDragHandle())
-            .gesture(headerDragGesture)
 
             Button { actions.openMain(nil) } label: {
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 8.5, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.black.opacity(0.55))
                     .frame(width: 14, height: 14)
             }
             .buttonStyle(.plain)
@@ -68,7 +63,7 @@ struct CompactView: View {
             Button { actions.hide() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Color.black.opacity(0.35))
                     .frame(width: 14, height: 14)
             }
             .buttonStyle(.plain)
@@ -82,7 +77,7 @@ struct CompactView: View {
         HStack {
             Text("还没有选择要监控的 AI")
                 .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.black.opacity(0.4))
             Spacer()
             Text("打开主界面")
                 .font(.system(size: 9.5, weight: .medium))
@@ -92,51 +87,6 @@ struct CompactView: View {
         .frame(height: CompactLayout.rowHeight)
         .contentShape(Rectangle())
         .onTapGesture { actions.openMain(nil) }
-    }
-
-    // MARK: - 拖动 / 点击
-
-    private var headerDragGesture: some Gesture {
-        DragGesture(minimumDistance: 2, coordinateSpace: .global)
-            .onChanged { value in
-                if !isDragging {
-                    isDragging = true
-                    actions.dragBegan()
-                }
-                actions.dragChanged(value.translation)
-            }
-            .onEnded { _ in
-                isDragging = false
-                actions.dragEnded()
-            }
-    }
-
-    /// 一个手势同时处理“拖动窗口”和“点击打开主界面”：
-    /// 位移很小视为点击，超过阈值则拖动。
-    private func rowGesture(for row: CompactRowModel) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .global)
-            .onChanged { value in
-                if !isDragging {
-                    isDragging = true
-                    dragMoved = false
-                    actions.dragBegan()
-                }
-                if abs(value.translation.width) + abs(value.translation.height) > 3 {
-                    dragMoved = true
-                }
-                if dragMoved {
-                    actions.dragChanged(value.translation)
-                }
-            }
-            .onEnded { _ in
-                let moved = dragMoved
-                isDragging = false
-                dragMoved = false
-                actions.dragEnded()
-                if !moved {
-                    actions.openMain(row.provider)
-                }
-            }
     }
 }
 
@@ -161,20 +111,20 @@ struct CompactRowItem: View {
                     .fill(Theme.color(for: summary.color).opacity(isIdle ? 0.10 : 0.18))
                     .frame(width: 12, height: 12)
                 Circle()
-                    .fill(isIdle ? Color.secondary.opacity(0.5) : Theme.color(for: summary.color))
+                    .fill(isIdle ? Color.black.opacity(0.3) : Theme.color(for: summary.color))
                     .frame(width: 5, height: 5)
             }
 
             Text(row.provider)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isIdle ? .secondary : .primary)
+                .foregroundStyle(isIdle ? Color.black.opacity(0.45) : Color.black.opacity(0.85))
                 .lineLimit(1)
 
             Spacer(minLength: 4)
 
             Text(summary.text)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(isIdle ? Color.secondary : Theme.color(for: summary.color))
+                .foregroundStyle(isIdle ? Color.black.opacity(0.4) : Theme.color(for: summary.color))
                 .lineLimit(1)
         }
         .padding(.horizontal, 9)
@@ -190,36 +140,7 @@ struct CompactRowItem: View {
 
     private var fillColor: Color {
         if highlighted { return Theme.completed.opacity(0.16) }
-        if hovering { return Color.primary.opacity(0.06) }
+        if hovering { return Color.black.opacity(0.05) }
         return .clear
     }
-}
-
-
-// MARK: - 标题栏拖动区域（AppKit）
-
-/// 用 NSView + performDrag 实现窗口拖动，避免 SwiftUI 手势随窗口移动而失效
-private struct WindowDragHandle: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { DragView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    final class DragView: NSView {
-        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-        override var mouseDownCanMoveWindow: Bool { true }
-
-        override func resetCursorRects() {
-            addCursorRect(bounds, cursor: .openHand)
-        }
-
-        override func mouseDown(with event: NSEvent) {
-            Log.write("拖动浮窗")
-            window?.performDrag(with: event)
-            NotificationCenter.default.post(name: .panelDragEnded, object: nil)
-        }
-    }
-}
-
-
-extension Notification.Name {
-    static let panelDragEnded = Notification.Name("AIMonitorPanelDragEnded")
 }

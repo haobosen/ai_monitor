@@ -70,7 +70,4 @@ final class TaskStore: ObservableObject {
 final class PanelActions: ObservableObject {
     var hide: () -> Void = {}
     var openMain: (String?) -> Void = { _ in }
-    var dragBegan: () -> Void = {}
-    var dragChanged: (CGSize) -> Void = { _ in }
-    var dragEnded: () -> Void = {}
 }

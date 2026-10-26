@@ -2,17 +2,21 @@ import SwiftUI
 import AppKit
 
 enum Theme {
-    static let accent = Color(red: 0.46, green: 0.55, blue: 1.0)
-    static let running = Color(red: 0.35, green: 0.62, blue: 1.0)
-    static let waiting = Color(red: 1.0, green: 0.69, blue: 0.22)
-    static let failed = Color(red: 1.0, green: 0.40, blue: 0.40)
-    static let completed = Color(red: 0.30, green: 0.80, blue: 0.55)
+    static let accent = Color(red: 0.27, green: 0.38, blue: 0.96)
+    static let running = Color(red: 0.16, green: 0.47, blue: 0.96)
+    static let waiting = Color(red: 0.93, green: 0.58, blue: 0.08)
+    static let failed = Color(red: 0.90, green: 0.23, blue: 0.28)
+    static let completed = Color(red: 0.08, green: 0.66, blue: 0.44)
 
     // 主界面浅色画布：白底带一点蓝紫，不再使用系统灰色
-    static let canvasTop = Color(red: 0.985, green: 0.99, blue: 1.0)
-    static let canvasBottom = Color(red: 0.945, green: 0.96, blue: 0.995)
+    static let canvasTop = Color(red: 0.93, green: 0.95, blue: 1.0)
+    static let canvasBottom = Color(red: 0.90, green: 0.93, blue: 1.0)
+    /// 主界面画布：明确的浅蓝，不再用接近白的渐变（容易被看成灰）
+    static let canvas = Color(red: 0.905, green: 0.93, blue: 1.0)
     static let card = Color.white
-    static let ink = Color(red: 0.11, green: 0.13, blue: 0.18)
+    static let ink = Color(red: 0.07, green: 0.08, blue: 0.11)
+    static let inkSecondary = Color(red: 0.26, green: 0.30, blue: 0.38)
+    static let inkTertiary = Color(red: 0.44, green: 0.48, blue: 0.56)
 
     static let panelWidth: CGFloat = 380
     static let panelHeight: CGFloat = 500

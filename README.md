@@ -84,7 +84,44 @@ DeepSeek Harness（dsh）：
 
 ## 安装与运行
 
-已构建好的应用在：
+### 从 GitHub 源码运行（开发者）
+
+仓库只包含源码，**不包含 `dist/` 里的 .app**（构建产物已被 `.gitignore` 忽略）。下载后需要本机编译一次。
+
+要求：macOS 14+、Xcode Command Line Tools（提供 `swiftc`）。
+
+```bash
+xcode-select --install      # 如果还没装命令行工具
+git clone https://github.com/haobosen/ai_monitor.git
+cd ai_monitor
+./build.sh
+open "dist/AI Monitor.app"
+```
+
+构建完成后，把 `dist/AI Monitor.app` 拖到「应用程序」即可。首次启动会走初始化流程。
+
+### 直接分发 .app（普通用户）
+
+如果希望别人下载后直接双击使用，可以把构建好的 app 打成 zip，上传到 GitHub 的 **Releases**：
+
+```bash
+ditto -c -k --keepParent "dist/AI Monitor.app" "AI Monitor.zip"
+```
+
+对方解压后拖进「应用程序」。因为应用是 ad-hoc 签名、没有经过 Apple 公证，第一次打开需要：
+
+1. 右键点 `AI Monitor.app` →「打开」→ 再点「打开」
+2. 如果仍被拦截，执行：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/AI Monitor.app"
+```
+
+> 注意：`build.sh` 默认只编译当前机器架构（Apple Silicon 构建的包不能在 Intel 上运行）。要同时支持两种芯片，需要在对应机器上分别构建，或把脚本改成 universal binary。
+
+### 已经在本机构建过
+
+应用在：
 
 ```
 dist/AI Monitor.app

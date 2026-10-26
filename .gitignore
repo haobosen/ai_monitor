@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.log
+
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -112,14 +112,14 @@ struct CompactRowItem: View {
                         .fill(Color.black.opacity(0.28))
                         .frame(width: 7, height: 7)
                 } else if summary.color == .running {
-                    LoadingRing(size: 12, lineWidth: 1.8)
+                    LoadingRing(size: 9, lineWidth: 1.5)
                 } else {
                     Circle()
                         .fill(Theme.color(for: summary.color))
                         .frame(width: 7, height: 7)
                 }
             }
-            .frame(width: 12, height: 12)
+            .frame(width: 10, height: 10)
 
             Text(row.provider)
                 .font(.system(size: 11, weight: .medium))

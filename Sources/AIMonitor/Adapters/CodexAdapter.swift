@@ -20,6 +20,8 @@ final class CodexAdapter {
         var lastTaskAt: Date?
         var lastActivityAt: Date?
         var lastError: String?
+        /// 最近一条 response_item 的类型（function_call / function_call_output / reasoning...）
+        var lastResponseType: String?
         var isInternal = false
     }
 
@@ -99,11 +101,21 @@ final class CodexAdapter {
                 return .completed
             }
             return .failed
-        case "error", "stream_error":
+        case "error":
             return .failed
+        case "stream_error":
+            // 网络断开后 Codex 会自动重连，不应直接判失败
+            return .running
         case "task_started":
-            // 近期有写入 = 正在跑；长时间无写入 = 很可能停在审批 / 等待用户
-            return idle > 300 ? .waiting : .running
+            // 只有“工具已发起但结果一直没回来”才可能是停在审批；
+            // 模型长时间思考、网络重连期间不应误报“需要操作”。
+            let pendingTool = summary.lastResponseType == "function_call"
+                || summary.lastResponseType == "custom_tool_call"
+                || summary.lastResponseType == "local_shell_call"
+            if pendingTool { return idle > 600 ? .waiting : .running }
+            // 没有待审批的工具：模型思考 / 网络重连可能持续很久，保持运行中，
+            // 不再用“多久没写文件”猜测需要操作。
+            return .running
         default:
             return .completed
         }
@@ -229,6 +241,10 @@ final class CodexAdapter {
         if summary.model == nil, type == "thread_settings_applied" {
             let settings = payload?["thread_settings"] as? [String: Any]
             summary.model = settings?["model"] as? String
+        }
+
+        if object["type"] as? String == "response_item" {
+            summary.lastResponseType = type
         }
 
         guard stateEvents.contains(type) else { return }

@@ -59,16 +59,19 @@ Claude Code：
 
 - 会话进程还在 + 最近有写入 → **运行中**
 - 最后一条是带工具调用的 assistant 消息，且超过 3 分钟没有新写入 → **需要操作**（通常是在等权限确认）
-- 一轮回复已收尾（最后一条 assistant 只有文本）→ **已完成**
+- 一轮回复已收尾（最后一条 assistant 的 `stop_reason` 是 `end_turn` / `stop_sequence`）→ **已完成**
+- 中间的 thinking / 文本片段不会被当成完成，避免状态来回跳
 - 你点了停止 / 按 Esc，记录里出现 `[Request interrupted by user]` → **已完成**（详情标「已手动停止」）
 - 最后一条是 API 错误 / 进程异常 → **失败**
 - 进程结束但记录在 6 小时内 → 作为**历史任务**展示
 
 Codex：
 
-- `task_started` → **运行中**；超过 5 分钟无写入 → **需要操作**
+- `task_started` → **运行中**
+- 只有工具调用已发起、结果超过 10 分钟没回来 → **需要操作**（可能在等审批）；单纯模型思考、网络重连期间仍算运行中
 - `task_complete` → **已完成**
 - `turn_aborted` 且 reason 是 `interrupted` / `cancelled`（用户主动停止）→ **已完成**
+- `stream_error`（网络断开重连）→ **运行中**，不直接判失败
 - 其他 `turn_aborted` / `error` → **失败**
 
 DeepSeek Harness（dsh）：

@@ -107,21 +107,23 @@ final class ClaudeAdapter {
             // 一轮回复已经收尾，等待用户下一条指令
             return .completed
         case .assistantTool:
-            // 有工具还没返回结果：短时间算运行中；长时间无写入，很可能卡在权限确认
+            // 只有真的有待执行工具时才可能在等权限确认；
+            // 单纯的 thinking / 文本片段仍属于模型正在生成，不能判成待操作。
+            guard !info.pendingTools.isEmpty else { return .running }
             return idle > 180 ? .waiting : .running
         case .toolResult:
             // 工具结果已回写，模型正在继续推理
-            return idle > 300 ? .waiting : .running
+            return .running
         case .humanPrompt:
-            // 用户刚发消息、模型还没写回任何内容
-            return idle > 180 ? .waiting : .running
+            // 用户刚发消息、模型正在准备回复
+            return .running
         case .interrupted:
             // 用户点了停止 / 按了 Esc，Claude Code 会写入 “[Request interrupted by user]”
             return .completed
         case .error:
             return .failed
         case .unknown:
-            return idle > 120 ? .waiting : .running
+            return .running
         }
     }
 
@@ -133,8 +135,11 @@ final class ClaudeAdapter {
             parts.append("进程已结束")
         } else if info.lastKind == .interrupted {
             parts.append("已手动停止")
-        } else if info.lastKind == .assistantTool, idle > 180 {
+        } else if info.lastKind == .assistantTool, !info.pendingTools.isEmpty, idle > 180 {
             parts.append("等待工具确认")
+        } else if info.lastKind == .assistantTool, !info.pendingTools.isEmpty,
+                  let tool = info.pendingTools.first {
+            parts.append("调用 \(tool)")
         } else {
             parts.append("\(RelativeTime.string(idle))活跃")
         }
@@ -255,7 +260,19 @@ final class ClaudeAdapter {
                     return block["name"] as? String
                 }
                 info.pendingTools = tools
-                info.lastKind = tools.isEmpty ? .assistantText : .assistantTool
+
+                // Claude 会把 thinking / 文本 / 工具调用拆成多条 assistant 记录，
+                // 中间片段也可能只有文本。是否收尾要看 stop_reason，不能只看“有没有文本”。
+                let stop = (message?["stop_reason"] as? String)?.lowercased()
+                if !tools.isEmpty || stop == "tool_use" {
+                    info.lastKind = .assistantTool
+                } else if stop == "end_turn" || stop == "stop_sequence"
+                            || stop == "max_tokens" || stop == "refusal" {
+                    info.lastKind = .assistantText
+                } else {
+                    // stop_reason 缺失：仍在生成中，先按运行处理，避免反复误报完成
+                    info.lastKind = .assistantTool
+                }
 
             case "user":
                 if object["isApiErrorMessage"] as? Bool == true {

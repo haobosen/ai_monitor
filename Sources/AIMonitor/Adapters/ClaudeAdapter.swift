@@ -20,6 +20,7 @@ final class ClaudeAdapter {
     private struct TailInfo {
         var title: String?
         var lastPrompt: String?
+        var lastHumanPrompt: String?
         var model: String?
         var lastKind: LastKind = .unknown
         var pendingTools: [String] = []
@@ -147,8 +148,14 @@ final class ClaudeAdapter {
     }
 
     private func taskTitle(info: TailInfo, meta: SessionMeta) -> String {
+        // 用户要求：任务标题显示“我最新发送的内容”，优先于 AI 生成标题
+        if let prompt = info.lastPrompt, !prompt.isEmpty {
+            return AITask.truncate(prompt, 90)
+        }
+        if let prompt = info.lastHumanPrompt, !prompt.isEmpty {
+            return AITask.truncate(prompt, 90)
+        }
         if let title = info.title, !title.isEmpty { return AITask.truncate(title, 70) }
-        if let prompt = info.lastPrompt, !prompt.isEmpty { return AITask.truncate(prompt, 70) }
         if let name = meta.name, !name.isEmpty { return name }
         if let cwd = meta.cwd { return URL(fileURLWithPath: cwd).lastPathComponent }
         return "Claude Code 会话"
@@ -216,6 +223,28 @@ final class ClaudeAdapter {
         return info
     }
 
+    /// 清理 IDE 注入、system-reminder 等非用户正文
+    private func cleanUserPrompt(_ text: String) -> String? {
+        var cleaned = text
+        let patterns = [
+            "(?s)<ide_opened_file>.*?</ide_opened_file>",
+            "(?s)<ide_selection>.*?</ide_selection>",
+            "(?s)<system-reminder>.*?</system-reminder>",
+            "(?s)<command-name>.*?</command-name>",
+            "(?s)<command-message>.*?</command-message>",
+            "(?s)<command-args>.*?</command-args>",
+            "(?s)<local-command-stdout>.*?</local-command-stdout>",
+            "(?s)<local-command-stderr>.*?</local-command-stderr>",
+            "(?s)<user_instructions>.*?</user_instructions>",
+        ]
+        for pattern in patterns {
+            cleaned = cleaned.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !cleaned.hasPrefix("<") else { return nil }
+        return cleaned
+    }
+
     /// 取 user 消息里的纯文本，用来识别 Claude Code 的中断标记
     private func userText(_ object: [String: Any]) -> String {
         let message = object["message"] as? [String: Any]
@@ -237,11 +266,37 @@ final class ClaudeAdapter {
             if info.title == nil, type == "ai-title", let title = object["aiTitle"] as? String, !title.isEmpty {
                 info.title = title
             }
-            if info.lastPrompt == nil, type == "last-prompt", let prompt = object["lastPrompt"] as? String, !prompt.isEmpty {
-                info.lastPrompt = prompt
+            // last-prompt 是 Claude 在每次用户输入后追加的元信息，位置比原始消息更接近文件尾
+            if info.lastPrompt == nil,
+               type == "last-prompt",
+               let prompt = object["lastPrompt"] as? String,
+               !prompt.isEmpty {
+                let sessionId = object["sessionId"] as? String
+                let fileId = url.deletingPathExtension().lastPathComponent
+                if sessionId == nil || sessionId == fileId,
+                   let cleaned = cleanUserPrompt(prompt) {
+                    info.lastPrompt = cleaned
+                }
             }
             if info.lastTimestamp == nil, let raw = object["timestamp"] {
                 info.lastTimestamp = FileTail.date(from: raw)
+            }
+
+            // 记录最近一条真正的用户输入，作为任务标题；IDE 注入的上下文 / 工具结果要跳过
+            if info.lastHumanPrompt == nil,
+               type == "user",
+               object["isMeta"] as? Bool != true,
+               object["isSidechain"] as? Bool != true,
+               object["isApiErrorMessage"] as? Bool != true {
+                let message = object["message"] as? [String: Any]
+                let blocks = message?["content"] as? [[String: Any]] ?? []
+                let isToolResult = blocks.contains { $0["type"] as? String == "tool_result" }
+                let raw = userText(object)
+                if !isToolResult,
+                   raw.range(of: "interrupted by user", options: .caseInsensitive) == nil,
+                   let prompt = cleanUserPrompt(raw) {
+                    info.lastHumanPrompt = prompt
+                }
             }
 
             if type == "assistant", info.model == nil {

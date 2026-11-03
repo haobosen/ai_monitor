@@ -70,4 +70,6 @@ final class TaskStore: ObservableObject {
 final class PanelActions: ObservableObject {
     var hide: () -> Void = {}
     var openMain: (String?) -> Void = { _ in }
+    /// 浮窗某一行开始 / 结束悬停（provider, isHovering）
+    var hoverProvider: (String, Bool) -> Void = { _, _ in }
 }

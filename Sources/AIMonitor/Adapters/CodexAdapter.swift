@@ -245,6 +245,14 @@ final class CodexAdapter {
 
         if object["type"] as? String == "response_item" {
             summary.lastResponseType = type
+
+            // 用户要求：任务标题取最近一条用户输入，而不是会话开头那条
+            if type == "message",
+               payload?["role"] as? String == "user",
+               let text = messageText(payload?["content"]),
+               let cleaned = cleanTitle(text) {
+                summary.title = AITask.truncate(cleaned, 90)
+            }
         }
 
         guard stateEvents.contains(type) else { return }
@@ -332,10 +340,10 @@ final class CodexAdapter {
     private func cleanTitle(_ text: String) -> String? {
         var cleaned = text
         let blockPatterns = [
-            "<environment_context>.*?</environment_context>",
-            "<external_codex_apps_open_page>.*?</external_codex_apps_open_page>",
-            "<permission[^>]*>.*?</permission>",
-            "<user_instructions>.*?</user_instructions>",
+            "(?s)<environment_context>.*?</environment_context>",
+            "(?s)<external_codex_apps_open_page>.*?</external_codex_apps_open_page>",
+            "(?s)<permission[^>]*>.*?</permission>",
+            "(?s)<user_instructions>.*?</user_instructions>",
         ]
         for pattern in blockPatterns {
             cleaned = cleaned.replacingOccurrences(of: pattern, with: "", options: .regularExpression)

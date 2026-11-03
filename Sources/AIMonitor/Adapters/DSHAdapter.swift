@@ -131,15 +131,13 @@ enum DSHAdapter {
             return nil
         }
 
-        // 进行中的会话展示“这一轮在做什么”；已结束的会话用 dsh 生成的会话标题更准确
+        // 任务标题优先使用最近一轮用户输入，主界面和浮窗保持一致
         let displayTitle: String
         let promptTitle = lastPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if isOpen, !promptTitle.isEmpty {
+        if !promptTitle.isEmpty {
             displayTitle = AITask.truncate(promptTitle, 90)
         } else if let title, !title.isEmpty {
             displayTitle = title
-        } else if !promptTitle.isEmpty {
-            displayTitle = AITask.truncate(promptTitle, 90)
         } else if !lastResponse.isEmpty {
             displayTitle = AITask.truncate(lastResponse, 90)
         } else {

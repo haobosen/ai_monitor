@@ -20,7 +20,8 @@ struct CompactView: View {
                 ForEach(rows) { row in
                     CompactRowItem(
                         row: row,
-                        highlighted: store.highlightedProvider == row.provider
+                        highlighted: store.highlightedProvider == row.provider,
+                        onHoverChanged: { actions.hoverProvider(row.provider, $0) }
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { actions.openMain(row.provider) }
@@ -95,6 +96,7 @@ struct CompactView: View {
 struct CompactRowItem: View {
     let row: CompactRowModel
     let highlighted: Bool
+    let onHoverChanged: (Bool) -> Void
 
     @State private var hovering = false
 
@@ -140,8 +142,10 @@ struct CompactRowItem: View {
                 .fill(fillColor)
                 .padding(.horizontal, 4)
         )
-        .onHover { hovering = $0 }
-        .help("\(row.provider) · \(row.counts.total) 个任务，点击打开主界面")
+        .onHover { isHovering in
+            hovering = isHovering
+            onHoverChanged(isHovering)
+        }
     }
 
     private var fillColor: Color {

@@ -139,6 +139,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let directory = Self.snapshotDirectory()
         var report: [String] = []
 
+        if CommandLine.arguments.contains("--test-hover") {
+            panelController.debugShowHoverPreviewForFirstRow()
+        }
+
         let visibleWindows = NSApp.windows.filter { $0.isVisible }
         for (index, window) in visibleWindows.enumerated() {
             let name = "window-\(index).png"
@@ -171,6 +175,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             to: directory.appendingPathComponent("compact-demo.png")
         )
         report.append("compact-demo:\(demoOK) rows=\(demoRows.count)")
+
+        let hoverTasks = demoTasks.filter { $0.provider == "Claude Code" }
+        let hoverOK = SnapshotRenderer.capture(
+            TaskHoverPreview(provider: "Claude Code", tasks: hoverTasks, onOpen: {}),
+            size: NSSize(width: 320, height: 420),
+            background: .clear,
+            to: directory.appendingPathComponent("hover-demo.png")
+        )
+        report.append("hover-demo:\(hoverOK) tasks=\(hoverTasks.count)")
 
         let toastOK = SnapshotRenderer.capture(
             ToastView(task: demoTasks[0], onOpen: {}, onClose: {}),

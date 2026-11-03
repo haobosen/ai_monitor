@@ -64,10 +64,12 @@ final class PanelController {
     private let panel: FloatingPanel
     private let store: TaskStore
     private let actions: PanelActions
+    private let hoverPreview = HoverPreviewController()
 
     private var hasRestoredFrame = false
     private var cancellables = Set<AnyCancellable>()
     private var dragObserver: NSObjectProtocol?
+    private var moveObserver: NSObjectProtocol?
     private let frameKey = "panelFrame"
 
     var onVisibilityChange: ((Bool) -> Void)?
@@ -106,8 +108,15 @@ final class PanelController {
         panel.titlebarAppearsTransparent = true
         panel.acceptsMouseMovedEvents = true
 
-        actions.openMain = onOpenMain
+        actions.openMain = { [weak self] provider in
+            self?.hoverPreview.hide()
+            onOpenMain(provider)
+        }
         actions.hide = { [weak self] in self?.hide() }
+        actions.hoverProvider = { [weak self] provider, hovering in
+            guard let self, hovering else { return }
+            self.showHoverPreview(for: provider)
+        }
 
         let hosting = NSHostingView(rootView: CompactView(store: store, actions: actions))
         hosting.frame = NSRect(origin: .zero, size: size)
@@ -126,11 +135,26 @@ final class PanelController {
             self.clampToScreen()
             self.saveFrame()
         }
+
+        // 拖动浮窗时收起旁边的任务气泡，避免气泡停在旧位置
+        moveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            self?.hoverPreview.hide()
+        }
+    }
+
+    deinit {
+        if let dragObserver { NotificationCenter.default.removeObserver(dragObserver) }
+        if let moveObserver { NotificationCenter.default.removeObserver(moveObserver) }
     }
 
     // MARK: - 显示 / 隐藏
 
     func show() {
+        hoverPreview.hide()
         if !hasRestoredFrame {
             applyDefaultPosition()
             hasRestoredFrame = true
@@ -143,6 +167,7 @@ final class PanelController {
     }
 
     func hide() {
+        hoverPreview.hide()
         panel.orderOut(nil)
         onVisibilityChange?(false)
     }
@@ -156,12 +181,18 @@ final class PanelController {
     private func bindLayoutChanges() {
         store.$tasks
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshLayout() }
+            .sink { [weak self] _ in
+                self?.refreshLayout()
+                self?.refreshHoverPreview()
+            }
             .store(in: &cancellables)
 
         AppConfig.shared.$enabledProviders
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshLayout() }
+            .sink { [weak self] _ in
+                self?.hoverPreview.hide()
+                self?.refreshLayout()
+            }
             .store(in: &cancellables)
     }
 
@@ -175,6 +206,7 @@ final class PanelController {
         let old = panel.frame
         guard old.width != size.width || old.height != size.height else { return }
 
+        hoverPreview.hide()
         let frame = NSRect(
             x: old.origin.x,
             y: old.maxY - size.height,
@@ -183,6 +215,76 @@ final class PanelController {
         )
         panel.setFrame(frame, display: true, animate: false)
         if panel.isVisible { clampToScreen() }
+    }
+
+    // MARK: - 悬停任务气泡
+
+    /// 调试用：不依赖鼠标，直接展开第一个 AI 的气泡（用于离屏截图）
+    func debugShowHoverPreviewForFirstRow() {
+        let rows = CompactRows.models(
+            tasks: store.tasks,
+            enabled: AppConfig.shared.enabledProviders
+        )
+        guard let first = rows.first, let index = rows.firstIndex(where: { $0.id == first.id }) else { return }
+        let tasks = store.tasks.filter { $0.provider == first.provider }
+        hoverPreview.show(
+            provider: first.provider,
+            tasks: tasks,
+            anchor: rowRect(for: index),
+            onOpen: {},
+            trackMouse: false
+        )
+    }
+
+    private func showHoverPreview(for provider: String) {
+        guard panel.isVisible,
+              let index = rowIndex(for: provider) else {
+            hoverPreview.hide()
+            return
+        }
+
+        let tasks = store.tasks.filter { $0.provider == provider }
+        hoverPreview.show(
+            provider: provider,
+            tasks: tasks,
+            anchor: rowRect(for: index),
+            onOpen: { [weak self] in
+                self?.actions.openMain(provider)
+            }
+        )
+    }
+
+    private func refreshHoverPreview() {
+        guard hoverPreview.isVisible else { return }
+        guard let provider = hoverPreview.provider,
+              panel.isVisible,
+              let index = rowIndex(for: provider) else {
+            hoverPreview.hide()
+            return
+        }
+
+        let tasks = store.tasks.filter { $0.provider == provider }
+        hoverPreview.update(provider: provider, tasks: tasks, anchor: rowRect(for: index))
+    }
+
+    private func rowIndex(for provider: String) -> Int? {
+        CompactRows.models(
+            tasks: store.tasks,
+            enabled: AppConfig.shared.enabledProviders
+        ).firstIndex { $0.provider == provider }
+    }
+
+    /// 行的屏幕坐标（含浮窗 8pt 阴影边距）
+    private func rowRect(for index: Int) -> NSRect {
+        let frame = panel.frame
+        let top = frame.maxY - CompactLayout.shadowPadding
+        let maxY = top - CompactLayout.headerHeight - CGFloat(index) * CompactLayout.rowHeight
+        return NSRect(
+            x: frame.minX + CompactLayout.shadowPadding,
+            y: maxY - CompactLayout.rowHeight,
+            width: CompactLayout.cardWidth,
+            height: CompactLayout.rowHeight
+        )
     }
 
     // MARK: - 位置

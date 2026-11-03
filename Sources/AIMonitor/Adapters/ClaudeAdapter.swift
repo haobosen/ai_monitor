@@ -150,17 +150,18 @@ final class ClaudeAdapter {
     }
 
     private func taskTitle(info: TailInfo, meta: SessionMeta) -> String {
-        // 优先最近一条有实际内容的用户输入；只有“继续/好的”时回退到上一条
-        if let prompt = info.lastMeaningfulPrompt, !prompt.isEmpty {
-            return AITask.truncate(prompt, 90)
-        }
+        // 直接读取原始用户消息，比 Claude 后写的 last-prompt 元信息快很多；
+        // 优先最近一条有实际内容的用户输入，只有“继续/好的”时才回退到上一条。
         if let prompt = info.lastMeaningfulHumanPrompt, !prompt.isEmpty {
             return AITask.truncate(prompt, 90)
         }
-        if let prompt = info.lastPrompt, !prompt.isEmpty {
+        if let prompt = info.lastMeaningfulPrompt, !prompt.isEmpty {
             return AITask.truncate(prompt, 90)
         }
         if let prompt = info.lastHumanPrompt, !prompt.isEmpty {
+            return AITask.truncate(prompt, 90)
+        }
+        if let prompt = info.lastPrompt, !prompt.isEmpty {
             return AITask.truncate(prompt, 90)
         }
         if let title = info.title, !title.isEmpty { return AITask.truncate(title, 70) }

@@ -12,6 +12,7 @@ final class CodexAdapter {
 
     private struct Summary {
         var title: String?
+        var latestTitle: String?
         var cwd: String?
         var model: String?
         var originator: String?
@@ -76,7 +77,7 @@ final class CodexAdapter {
             tasks.append(AITask(
                 id: "codex:\(url.lastPathComponent)",
                 provider: "Codex",
-                title: summary.title ?? "Codex 任务",
+                title: summary.title ?? summary.latestTitle ?? "Codex 任务",
                 project: summary.cwd ?? "—",
                 status: status,
                 detail: detailParts.isEmpty ? "Codex" : detailParts.joined(separator: " · "),
@@ -213,12 +214,15 @@ final class CodexAdapter {
             if summary.cwd == nil { summary.cwd = payload?["cwd"] as? String }
             if summary.model == nil { summary.model = payload?["model"] as? String }
         case "response_item":
-            if summary.title == nil,
-               payload?["type"] as? String == "message",
+            if payload?["type"] as? String == "message",
                payload?["role"] as? String == "user",
                let text = messageText(payload?["content"]),
                let cleaned = cleanTitle(text) {
-                summary.title = AITask.truncate(cleaned, 70)
+                let title = AITask.truncate(cleaned, 90)
+                if summary.latestTitle == nil { summary.latestTitle = title }
+                if summary.title == nil, !PromptText.isFiller(cleaned) {
+                    summary.title = title
+                }
             }
         case "event_msg":
             if let settings = payload?["thread_settings"] as? [String: Any],
@@ -251,7 +255,11 @@ final class CodexAdapter {
                payload?["role"] as? String == "user",
                let text = messageText(payload?["content"]),
                let cleaned = cleanTitle(text) {
-                summary.title = AITask.truncate(cleaned, 90)
+                let title = AITask.truncate(cleaned, 90)
+                summary.latestTitle = title
+                if !PromptText.isFiller(cleaned) {
+                    summary.title = title
+                }
             }
         }
 

@@ -20,7 +20,9 @@ final class ClaudeAdapter {
     private struct TailInfo {
         var title: String?
         var lastPrompt: String?
+        var lastMeaningfulPrompt: String?
         var lastHumanPrompt: String?
+        var lastMeaningfulHumanPrompt: String?
         var model: String?
         var lastKind: LastKind = .unknown
         var pendingTools: [String] = []
@@ -148,7 +150,13 @@ final class ClaudeAdapter {
     }
 
     private func taskTitle(info: TailInfo, meta: SessionMeta) -> String {
-        // 用户要求：任务标题显示“我最新发送的内容”，优先于 AI 生成标题
+        // 优先最近一条有实际内容的用户输入；只有“继续/好的”时回退到上一条
+        if let prompt = info.lastMeaningfulPrompt, !prompt.isEmpty {
+            return AITask.truncate(prompt, 90)
+        }
+        if let prompt = info.lastMeaningfulHumanPrompt, !prompt.isEmpty {
+            return AITask.truncate(prompt, 90)
+        }
         if let prompt = info.lastPrompt, !prompt.isEmpty {
             return AITask.truncate(prompt, 90)
         }
@@ -216,11 +224,71 @@ final class ClaudeAdapter {
         }
         lock.unlock()
 
-        let info = parseTail(url)
+        var info = parseTail(url)
         lock.lock()
         cache[url.path] = (stamp, info)
         lock.unlock()
+        // 如果最近只剩“继续”这类推进语，向上多读一段历史找上一条有内容的提问
+        if info.lastMeaningfulPrompt == nil,
+           info.lastMeaningfulHumanPrompt == nil,
+           info.lastPrompt != nil || info.lastHumanPrompt != nil {
+            let older = olderPrompts(for: url)
+            if info.lastMeaningfulPrompt == nil { info.lastMeaningfulPrompt = older.prompt }
+            if info.lastMeaningfulHumanPrompt == nil { info.lastMeaningfulHumanPrompt = older.human }
+        }
+
         return info
+    }
+
+    /// 向上扩大窗口，只找上一条有实际内容的用户输入
+    private func olderPrompts(for url: URL) -> (prompt: String?, human: String?) {
+        let windows = [1024 * 1024, 2 * 1024 * 1024, 4 * 1024 * 1024,
+                       8 * 1024 * 1024, 16 * 1024 * 1024, 32 * 1024 * 1024]
+        let fileId = url.deletingPathExtension().lastPathComponent
+
+        for window in windows {
+            var prompt: String?
+            var human: String?
+
+            for object in FileTail.tailObjects(at: url, maxBytes: window).reversed() {
+                let type = object["type"] as? String
+
+                if prompt == nil,
+                   type == "last-prompt",
+                   let raw = object["lastPrompt"] as? String,
+                   !raw.isEmpty {
+                    let sessionId = object["sessionId"] as? String
+                    if sessionId == nil || sessionId == fileId,
+                       let cleaned = cleanUserPrompt(raw),
+                       !PromptText.isFiller(cleaned) {
+                        prompt = cleaned
+                    }
+                }
+
+                if human == nil,
+                   type == "user",
+                   object["isMeta"] as? Bool != true,
+                   object["isSidechain"] as? Bool != true,
+                   object["isApiErrorMessage"] as? Bool != true {
+                    let message = object["message"] as? [String: Any]
+                    let blocks = message?["content"] as? [[String: Any]] ?? []
+                    let isToolResult = blocks.contains { $0["type"] as? String == "tool_result" }
+                    let raw = userText(object)
+                    if !isToolResult,
+                       raw.range(of: "interrupted by user", options: .caseInsensitive) == nil,
+                       let cleaned = cleanUserPrompt(raw),
+                       !PromptText.isFiller(cleaned) {
+                        human = cleaned
+                    }
+                }
+
+                if prompt != nil, human != nil { break }
+            }
+
+            if prompt != nil || human != nil { return (prompt, human) }
+        }
+
+        return (nil, nil)
     }
 
     /// 清理 IDE 注入、system-reminder 等非用户正文
@@ -267,15 +335,17 @@ final class ClaudeAdapter {
                 info.title = title
             }
             // last-prompt 是 Claude 在每次用户输入后追加的元信息，位置比原始消息更接近文件尾
-            if info.lastPrompt == nil,
-               type == "last-prompt",
+            if type == "last-prompt",
                let prompt = object["lastPrompt"] as? String,
                !prompt.isEmpty {
                 let sessionId = object["sessionId"] as? String
                 let fileId = url.deletingPathExtension().lastPathComponent
                 if sessionId == nil || sessionId == fileId,
                    let cleaned = cleanUserPrompt(prompt) {
-                    info.lastPrompt = cleaned
+                    if info.lastPrompt == nil { info.lastPrompt = cleaned }
+                    if info.lastMeaningfulPrompt == nil, !PromptText.isFiller(cleaned) {
+                        info.lastMeaningfulPrompt = cleaned
+                    }
                 }
             }
             if info.lastTimestamp == nil, let raw = object["timestamp"] {
@@ -283,8 +353,7 @@ final class ClaudeAdapter {
             }
 
             // 记录最近一条真正的用户输入，作为任务标题；IDE 注入的上下文 / 工具结果要跳过
-            if info.lastHumanPrompt == nil,
-               type == "user",
+            if type == "user",
                object["isMeta"] as? Bool != true,
                object["isSidechain"] as? Bool != true,
                object["isApiErrorMessage"] as? Bool != true {
@@ -295,7 +364,10 @@ final class ClaudeAdapter {
                 if !isToolResult,
                    raw.range(of: "interrupted by user", options: .caseInsensitive) == nil,
                    let prompt = cleanUserPrompt(raw) {
-                    info.lastHumanPrompt = prompt
+                    if info.lastHumanPrompt == nil { info.lastHumanPrompt = prompt }
+                    if info.lastMeaningfulHumanPrompt == nil, !PromptText.isFiller(prompt) {
+                        info.lastMeaningfulHumanPrompt = prompt
+                    }
                 }
             }
 

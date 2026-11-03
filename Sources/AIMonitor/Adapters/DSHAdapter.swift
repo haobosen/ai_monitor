@@ -60,7 +60,9 @@ enum DSHAdapter {
         let outline = value(rows, "turnOutline") as? [String: Any]
         let turns = outline?["turns"] as? [[String: Any]]
         let lastTurn = turns?.last
+        let prompts = (turns ?? []).compactMap { $0["prompt"] as? String }
         let lastPrompt = lastTurn?["prompt"] as? String
+        let meaningfulPrompt = prompts.reversed().first { !PromptText.isFiller($0) }
         let lastResponse = lastTurn?["response"] as? String ?? ""
 
         // 空白会话（只打开过、没提问）不展示
@@ -131,9 +133,10 @@ enum DSHAdapter {
             return nil
         }
 
-        // 任务标题优先使用最近一轮用户输入，主界面和浮窗保持一致
+        // 任务标题优先使用最近一条有实际内容的用户输入；只有“继续”时回退到上一条
         let displayTitle: String
-        let promptTitle = lastPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let promptTitle = (meaningfulPrompt ?? lastPrompt)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !promptTitle.isEmpty {
             displayTitle = AITask.truncate(promptTitle, 90)
         } else if let title, !title.isEmpty {

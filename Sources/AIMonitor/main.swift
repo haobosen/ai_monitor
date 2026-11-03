@@ -41,7 +41,7 @@ if arguments.contains("--discover") {
 }
 
 if arguments.contains("--dump") {
-    let tasks = MonitorEngine.scanAll()
+    let tasks = TaskCollapse.latestPerProject(MonitorEngine.scanAll())
     let formatter = ISO8601DateFormatter()
     let payload: [[String: Any]] = tasks.map { task in
         var dict: [String: Any] = [

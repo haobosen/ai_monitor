@@ -26,7 +26,8 @@ final class TaskStore: ObservableObject {
     }
 
     func apply(_ tasks: [AITask]) {
-        self.tasks = tasks
+        // 同一项目 / 会话只保留最新的一条，避免主界面和浮窗出现重复项目
+        self.tasks = TaskCollapse.latestPerProject(tasks)
         lastUpdated = Date()
     }
 

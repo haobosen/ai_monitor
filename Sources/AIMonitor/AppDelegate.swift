@@ -80,7 +80,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.menuBarController.refreshIcon()
 
             let newlyCompleted = self.notifier.process(tasks)
+            let displayedIDs = Set(self.store.tasks.map { $0.id })
+            var shownCompletion = false
             for task in newlyCompleted {
+                // 被同项目更新会话覆盖的旧任务不弹通知
+                guard displayedIDs.contains(task.id) else { continue }
+                shownCompletion = true
                 self.store.showCompletion(task)
                 self.store.highlight(provider: task.provider)
                 if !self.isSnapshotMode, !self.mainWindowController.isVisible {
@@ -89,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
-            if !newlyCompleted.isEmpty {
+            if shownCompletion {
                 if self.panelController.isVisible || self.mainWindowController.isVisible {
                     self.store.clearUnread()
                 }

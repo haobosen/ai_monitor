@@ -8,6 +8,7 @@ final class HoverPreviewController {
     private var hosting: NSHostingView<TaskHoverPreview>?
     private var currentProvider: String?
     private var currentTasks: [AITask] = []
+    private var currentSignature = ""
     private var anchorRect: NSRect = .zero
     private var onOpen: (() -> Void)?
     private var trackingTimer: Timer?
@@ -25,11 +26,13 @@ final class HoverPreviewController {
               anchor: NSRect,
               onOpen: @escaping () -> Void,
               trackMouse: Bool = true) {
-        let contentChanged = provider != currentProvider || tasks != currentTasks
+        let signature = Self.signature(for: tasks)
+        let contentChanged = provider != currentProvider || signature != currentSignature
         let anchorChanged = anchor != anchorRect
 
         currentProvider = provider
         currentTasks = tasks
+        currentSignature = signature
         anchorRect = anchor
         self.onOpen = onOpen
 
@@ -53,10 +56,12 @@ final class HoverPreviewController {
 
     func update(provider: String, tasks: [AITask], anchor: NSRect) {
         guard isVisible, provider == currentProvider else { return }
-        let contentChanged = tasks != currentTasks
+        let signature = Self.signature(for: tasks)
+        let contentChanged = signature != currentSignature
         let anchorChanged = anchor != anchorRect
 
         currentTasks = tasks
+        currentSignature = signature
         anchorRect = anchor
         if contentChanged { rebuildContent() }
         if contentChanged || anchorChanged { position() }
@@ -68,6 +73,13 @@ final class HoverPreviewController {
         trackingTimer = nil
         outsideSince = nil
         panel?.orderOut(nil)
+    }
+
+    /// 只比较气泡里真正显示的内容，避免 updatedAt 每 2 秒变化导致气泡重建/闪烁
+    private static func signature(for tasks: [AITask]) -> String {
+        tasks.map {
+            "\($0.id)\u{1F}\($0.status.rawValue)\u{1F}\($0.title)\u{1F}\($0.project)"
+        }.joined(separator: "\n")
     }
 
     // MARK: - 面板

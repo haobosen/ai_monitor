@@ -64,6 +64,9 @@ enum DSHAdapter {
         let lastPrompt = lastTurn?["prompt"] as? String
         let meaningfulPrompt = prompts.reversed().first { !PromptText.isFiller($0) }
         let lastResponse = lastTurn?["response"] as? String ?? ""
+        let promptStartedAt = double(lastPromptAt).map {
+            Date(timeIntervalSince1970: $0 / 1000)
+        }
 
         // 空白会话（只打开过、没提问）不展示
         let isBlank = listMeta?["blank"] as? Bool ?? false
@@ -77,6 +80,9 @@ enum DSHAdapter {
 
         let stats = value(rows, "sessionStats") as? [String: Any]
         let openStep = stats?["openStep"] as? [String: Any]
+        let stepStartedAt = double(openStep?["startTime"]).map {
+            Date(timeIntervalSince1970: $0 / 1000)
+        }
         let questions = value(rows, "userQuestions") as? [String: Any]
         let activeQuestions = (questions?["questions"] as? [String: Any])?["active"] as? [Any] ?? []
 
@@ -160,6 +166,7 @@ enum DSHAdapter {
             status: status,
             detail: detail,
             updatedAt: activity,
+            startedAt: promptStartedAt ?? stepStartedAt,
             pid: nil,
             sourcePath: url.path,
             isHistorical: status == .completed

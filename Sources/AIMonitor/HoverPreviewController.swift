@@ -226,6 +226,13 @@ struct TaskHoverPreview: View {
     }
 
     var body: some View {
+        // 气泡打开期间每秒刷新一次，执行时间可以精确到秒
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            content(now: context.date)
+        }
+    }
+
+    private func content(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Rectangle()
@@ -241,7 +248,7 @@ struct TaskHoverPreview: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(visibleTasks) { task in
-                        taskRow(task)
+                        taskRow(task, now: now)
                     }
                 }
                 if tasks.count > visibleTasks.count {
@@ -289,7 +296,7 @@ struct TaskHoverPreview: View {
         .padding(.bottom, 8)
     }
 
-    private func taskRow(_ task: AITask) -> some View {
+    private func taskRow(_ task: AITask, now: Date) -> some View {
         Button(action: onOpen) {
             HStack(alignment: .top, spacing: 7) {
                 PreviewStatusGlyph(status: task.status)
@@ -305,7 +312,7 @@ struct TaskHoverPreview: View {
                         Text(task.projectName)
                             .lineLimit(1)
                         Text("·")
-                        Text(RelativeTime.string(Date().timeIntervalSince(task.updatedAt)))
+                        Text(RelativeTime.string(now.timeIntervalSince(task.updatedAt)))
                     }
                     .font(.system(size: 9))
                     .foregroundStyle(Theme.inkTertiary)
@@ -313,19 +320,38 @@ struct TaskHoverPreview: View {
 
                 Spacer(minLength: 4)
 
-                Text(task.status.label)
-                    .font(.system(size: 8.5, weight: .semibold))
-                    .foregroundStyle(Theme.color(for: task.status))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(Theme.color(for: task.status).opacity(0.10))
-                    )
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text(task.status.label)
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundStyle(Theme.color(for: task.status))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(Theme.color(for: task.status).opacity(0.10))
+                        )
+
+                    Text(executionText(for: task, now: now))
+                        .font(.system(size: 8.5, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkTertiary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
             .padding(.vertical, 5)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func executionText(for task: AITask, now: Date) -> String {
+        guard let startedAt = task.startedAt else { return "已执行 —" }
+        let end = task.status.isActive ? now : task.updatedAt
+        let seconds = max(0, Int(end.timeIntervalSince(startedAt)))
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let remaining = seconds % 60
+        return String(format: "已执行 %02d:%02d:%02d", hours, minutes, remaining)
     }
 }
 

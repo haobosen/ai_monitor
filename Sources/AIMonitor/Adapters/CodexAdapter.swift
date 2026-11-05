@@ -20,6 +20,8 @@ final class CodexAdapter {
         var lastEventType: String?
         var lastTaskAt: Date?
         var lastActivityAt: Date?
+        var lastUserPromptAt: Date?
+        var taskStartedAt: Date?
         var lastError: String?
         /// 最近一条 response_item 的类型（function_call / function_call_output / reasoning...）
         var lastResponseType: String?
@@ -82,6 +84,7 @@ final class CodexAdapter {
                 status: status,
                 detail: detailParts.isEmpty ? "Codex" : detailParts.joined(separator: " · "),
                 updatedAt: updatedAt,
+                startedAt: summary.taskStartedAt ?? summary.lastUserPromptAt,
                 pid: nil,
                 sourcePath: url.path,
                 isHistorical: !status.isActive && idle > 900
@@ -253,12 +256,14 @@ final class CodexAdapter {
             // 用户要求：任务标题取最近一条用户输入，而不是会话开头那条
             if type == "message",
                payload?["role"] as? String == "user",
-               let text = messageText(payload?["content"]),
-               let cleaned = cleanTitle(text) {
-                let title = AITask.truncate(cleaned, 90)
-                summary.latestTitle = title
-                if !PromptText.isFiller(cleaned) {
-                    summary.title = title
+               let text = messageText(payload?["content"]) {
+                summary.lastUserPromptAt = FileTail.date(from: object["timestamp"]) ?? summary.lastUserPromptAt
+                if let cleaned = cleanTitle(text) {
+                    let title = AITask.truncate(cleaned, 90)
+                    summary.latestTitle = title
+                    if !PromptText.isFiller(cleaned) {
+                        summary.title = title
+                    }
                 }
             }
         }
@@ -271,6 +276,7 @@ final class CodexAdapter {
             summary.lastEventType = "task_started"
             summary.lastError = nil
             summary.lastTaskAt = timestamp
+            summary.taskStartedAt = timestamp ?? summary.taskStartedAt
             if let attribution = payload?["turn_attribution"] as? [String: Any] {
                 summary.trigger = attribution["turn_trigger"] as? String
             }

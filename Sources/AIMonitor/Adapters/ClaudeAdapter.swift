@@ -23,6 +23,7 @@ final class ClaudeAdapter {
         var lastMeaningfulPrompt: String?
         var lastHumanPrompt: String?
         var lastMeaningfulHumanPrompt: String?
+        var lastHumanPromptAt: Date?
         var model: String?
         var lastKind: LastKind = .unknown
         var pendingTools: [String] = []
@@ -86,6 +87,7 @@ final class ClaudeAdapter {
                 status: status,
                 detail: detail,
                 updatedAt: modified,
+                startedAt: info.lastHumanPromptAt ?? sessionStartDate(meta.startedAt),
                 pid: meta.pid,
                 sourcePath: transcript.path,
                 isHistorical: !alive
@@ -170,6 +172,12 @@ final class ClaudeAdapter {
         return "Claude Code 会话"
     }
 
+    /// Claude 的 startedAt 是毫秒时间戳
+    private func sessionStartDate(_ raw: Double?) -> Date? {
+        guard let raw, raw > 0 else { return nil }
+        return Date(timeIntervalSince1970: raw > 10_000_000_000 ? raw / 1000 : raw)
+    }
+
     // MARK: - 数据读取
 
     private func loadSessionMetas() -> [SessionMeta] {
@@ -229,6 +237,16 @@ final class ClaudeAdapter {
         lock.lock()
         cache[url.path] = (stamp, info)
         lock.unlock()
+        // 最新用户消息可能被大量工具输出推到 512KB 之外，导致执行时间误用会话开始时间
+        if info.lastHumanPromptAt == nil,
+           let newest = newestHumanPrompt(for: url) {
+            if info.lastHumanPrompt == nil { info.lastHumanPrompt = newest.text }
+            info.lastHumanPromptAt = newest.date
+            if info.lastMeaningfulHumanPrompt == nil, !PromptText.isFiller(newest.text) {
+                info.lastMeaningfulHumanPrompt = newest.text
+            }
+        }
+
         // 如果最近只剩“继续”这类推进语，向上多读一段历史找上一条有内容的提问
         if info.lastMeaningfulPrompt == nil,
            info.lastMeaningfulHumanPrompt == nil,
@@ -239,6 +257,31 @@ final class ClaudeAdapter {
         }
 
         return info
+    }
+
+    /// 向上扩大窗口，找最近一条真实用户消息及其时间
+    private func newestHumanPrompt(for url: URL) -> (text: String, date: Date?)? {
+        let windows = [1024 * 1024, 2 * 1024 * 1024, 4 * 1024 * 1024,
+                       8 * 1024 * 1024, 16 * 1024 * 1024, 32 * 1024 * 1024]
+
+        for window in windows {
+            for object in FileTail.tailObjects(at: url, maxBytes: window).reversed() {
+                guard object["type"] as? String == "user",
+                      object["isMeta"] as? Bool != true,
+                      object["isSidechain"] as? Bool != true,
+                      object["isApiErrorMessage"] as? Bool != true else { continue }
+
+                let message = object["message"] as? [String: Any]
+                let blocks = message?["content"] as? [[String: Any]] ?? []
+                if blocks.contains(where: { $0["type"] as? String == "tool_result" }) { continue }
+
+                let raw = userText(object)
+                guard raw.range(of: "interrupted by user", options: .caseInsensitive) == nil,
+                      let cleaned = cleanUserPrompt(raw) else { continue }
+                return (cleaned, FileTail.date(from: object["timestamp"]))
+            }
+        }
+        return nil
     }
 
     /// 向上扩大窗口，只找上一条有实际内容的用户输入
@@ -365,7 +408,10 @@ final class ClaudeAdapter {
                 if !isToolResult,
                    raw.range(of: "interrupted by user", options: .caseInsensitive) == nil,
                    let prompt = cleanUserPrompt(raw) {
-                    if info.lastHumanPrompt == nil { info.lastHumanPrompt = prompt }
+                    if info.lastHumanPrompt == nil {
+                        info.lastHumanPrompt = prompt
+                        info.lastHumanPromptAt = FileTail.date(from: object["timestamp"])
+                    }
                     if info.lastMeaningfulHumanPrompt == nil, !PromptText.isFiller(prompt) {
                         info.lastMeaningfulHumanPrompt = prompt
                     }

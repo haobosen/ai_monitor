@@ -61,6 +61,8 @@ struct AITask: Identifiable, Equatable {
     var status: TaskStatus
     var detail: String
     var updatedAt: Date
+    /// 当前任务/最近一轮开始执行的时间
+    var startedAt: Date?
     var pid: Int32?
     var sourcePath: String?
     /// 进程已结束、仅作为历史记录展示

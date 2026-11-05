@@ -87,7 +87,7 @@ final class ClaudeAdapter {
                 status: status,
                 detail: detail,
                 updatedAt: modified,
-                startedAt: info.lastHumanPromptAt ?? sessionStartDate(meta.startedAt),
+                startedAt: executionStartDate(info: info, meta: meta),
                 pid: meta.pid,
                 sourcePath: transcript.path,
                 isHistorical: !alive
@@ -176,6 +176,23 @@ final class ClaudeAdapter {
     private func sessionStartDate(_ raw: Double?) -> Date? {
         guard let raw, raw > 0 else { return nil }
         return Date(timeIntervalSince1970: raw > 10_000_000_000 ? raw / 1000 : raw)
+    }
+
+    /// 执行时间从“最新用户消息”和“本次 Claude 进程启动时间”中较晚的那个算起：
+    /// - 同一会话里继续提问：用最新消息时间
+    /// - 重新打开/恢复旧会话：用新进程启动时间，避免把历史对话算成今天才执行
+    private func executionStartDate(info: TailInfo, meta: SessionMeta) -> Date? {
+        let processStart = sessionStartDate(meta.startedAt)
+        switch (info.lastHumanPromptAt, processStart) {
+        case let (prompt?, process?):
+            return max(prompt, process)
+        case let (prompt?, nil):
+            return prompt
+        case let (nil, process?):
+            return process
+        case (nil, nil):
+            return nil
+        }
     }
 
     // MARK: - 数据读取

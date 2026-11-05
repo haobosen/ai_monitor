@@ -251,9 +251,6 @@ final class ClaudeAdapter {
         lock.unlock()
 
         var info = parseTail(url)
-        lock.lock()
-        cache[url.path] = (stamp, info)
-        lock.unlock()
         // 最新用户消息可能被大量工具输出推到 512KB 之外，导致执行时间误用会话开始时间
         if info.lastHumanPromptAt == nil,
            let newest = newestHumanPrompt(for: url) {
@@ -273,6 +270,10 @@ final class ClaudeAdapter {
             if info.lastMeaningfulHumanPrompt == nil { info.lastMeaningfulHumanPrompt = older.human }
         }
 
+        // 在补全最新消息之后再写缓存，否则后续刷新会退回旧标题/旧执行时间
+        lock.lock()
+        cache[url.path] = (stamp, info)
+        lock.unlock()
         return info
     }
 

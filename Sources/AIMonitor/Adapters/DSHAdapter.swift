@@ -57,6 +57,7 @@ enum DSHAdapter {
         let title = value(rows, "title") as? String
         let listMeta = value(rows, "sessionListMetadata") as? [String: Any]
         let lastPromptAt = double(listMeta?["lastPromptAt"])
+        let timeContext = value(rows, "timeContext") as? [String: Any]
         let outline = value(rows, "turnOutline") as? [String: Any]
         let turns = outline?["turns"] as? [[String: Any]]
         let lastTurn = turns?.last
@@ -64,7 +65,12 @@ enum DSHAdapter {
         let lastPrompt = lastTurn?["prompt"] as? String
         let meaningfulPrompt = prompts.reversed().first { !PromptText.isFiller($0) }
         let lastResponse = lastTurn?["response"] as? String ?? ""
-        let promptStartedAt = double(lastPromptAt).map {
+        // lastPromptAt 只记录“人类最后一次提问”；定时任务没有 prompt，
+        // 必须用本轮注入时间，否则会把多次定时执行算成一条几天的任务。
+        let injectionStartedAt = double(timeContext?["lastInjectionTime"]).map {
+            Date(timeIntervalSince1970: $0 / 1000)
+        }
+        let promptStartedAt = injectionStartedAt ?? double(lastPromptAt).map {
             Date(timeIntervalSince1970: $0 / 1000)
         }
 
@@ -95,7 +101,7 @@ enum DSHAdapter {
         var activity = fileModificationDate(url) ?? now
         for candidate in [
             double(openStep?["startTime"]),
-            double((value(rows, "timeContext") as? [String: Any])?["lastMessageTime"]),
+            double(timeContext?["lastMessageTime"]),
             lastPromptAt,
         ].compactMap({ $0 }) {
             let date = Date(timeIntervalSince1970: candidate / 1000)

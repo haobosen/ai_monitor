@@ -174,7 +174,6 @@ struct GroupHeader: View {
 
 struct SummaryBar: View {
     let counts: TaskCounts
-    let todayTokens: Int
     let historyTokens: Int
 
     var body: some View {
@@ -193,29 +192,19 @@ struct SummaryBar: View {
             Image(systemName: "bolt.fill")
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(Theme.accent)
-            Text("今日")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(Theme.inkSecondary)
-            Text(TokenFormat.short(todayTokens))
-                .font(.system(size: 10, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Theme.accent)
-            Text("·")
-                .font(.system(size: 9))
-                .foregroundStyle(Theme.inkTertiary)
-            Text("历史")
+            Text("Token 历史")
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(Theme.inkSecondary)
             Text(TokenFormat.short(historyTokens))
                 .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
-                .foregroundStyle(Theme.inkSecondary)
+                .foregroundStyle(Theme.accent)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Capsule().fill(Theme.accent.opacity(0.07)))
         .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.18), lineWidth: 0.8))
-        .help("今日：本地时间 0 点起；历史：启用统计以来的总用量（首次以当前任务累计值为基线，均不含缓存读取）")
+        .help("全部 AI 历史累计 Token（首次以当前任务累计值为基线，不含缓存读取）")
     }
 
     private func chip(_ value: Int, _ label: String, _ color: Color) -> some View {

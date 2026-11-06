@@ -94,6 +94,17 @@ struct TaskRow: View {
 
                     StatusPill(status: task.status)
 
+                    Text("·")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.inkTertiary)
+
+                    Text(TokenFormat.label(task.tokens))
+                        .font(.system(size: 9.5, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkTertiary)
+                        .lineLimit(1)
+                        .help("Token 使用量（不含缓存读取）")
+
                     Spacer(minLength: 2)
 
                     Text(relativeTime)

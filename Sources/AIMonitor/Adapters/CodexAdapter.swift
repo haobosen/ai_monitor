@@ -25,6 +25,8 @@ final class CodexAdapter {
         var lastError: String?
         /// 最近一条 response_item 的类型（function_call / function_call_output / reasoning...）
         var lastResponseType: String?
+        /// 会话累计 token（不含缓存读取）
+        var tokens: Int?
         var isInternal = false
     }
 
@@ -85,6 +87,7 @@ final class CodexAdapter {
                 detail: detailParts.isEmpty ? "Codex" : detailParts.joined(separator: " · "),
                 updatedAt: updatedAt,
                 startedAt: summary.taskStartedAt ?? summary.lastUserPromptAt,
+                tokens: summary.tokens,
                 pid: nil,
                 sourcePath: url.path,
                 isHistorical: !status.isActive && idle > 900
@@ -243,6 +246,15 @@ final class CodexAdapter {
         }
 
         let payload = object["payload"] as? [String: Any]
+
+        if object["type"] as? String == "token_usage_record",
+           let usage = payload?["thread_token_usage"] as? [String: Any] {
+            let total = intValue(usage["total_tokens"])
+            let cached = intValue(usage["cached_input_tokens"])
+            summary.tokens = max(0, total - cached)
+            return
+        }
+
         guard let type = payload?["type"] as? String else { return }
 
         if summary.model == nil, type == "thread_settings_applied" {
@@ -339,6 +351,12 @@ final class CodexAdapter {
             if hasTaskEvent { return objects }
         }
         return lastObjects
+    }
+
+    private func intValue(_ value: Any?) -> Int {
+        if let number = value as? NSNumber { return number.intValue }
+        if let text = value as? String { return Int(text) ?? 0 }
+        return 0
     }
 
     private func messageText(_ content: Any?) -> String? {

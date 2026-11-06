@@ -164,6 +164,14 @@ enum DSHAdapter {
         let model = lastUsed?["model"] as? String
         let detail = [model, reason].compactMap { $0 }.joined(separator: " · ")
 
+        // 会话累计 token；缓存读取不计入展示，避免几千万的重复上下文淹没数字
+        let tokenTotals = (value(rows, "tokenUsage") as? [String: Any])?["totals"] as? [String: Any]
+        let tokens: Int? = tokenTotals.map {
+            (int($0["uncachedInputTokens"]) ?? 0)
+                + (int($0["outputTokens"]) ?? 0)
+                + (int($0["cacheWriteTokens"]) ?? 0)
+        }
+
         return AITask(
             id: "dsh:\(sessionId)",
             provider: "DeepSeek Harness",
@@ -173,6 +181,7 @@ enum DSHAdapter {
             detail: detail,
             updatedAt: activity,
             startedAt: promptStartedAt ?? stepStartedAt,
+            tokens: tokens,
             pid: nil,
             sourcePath: url.path,
             isHistorical: status == .completed

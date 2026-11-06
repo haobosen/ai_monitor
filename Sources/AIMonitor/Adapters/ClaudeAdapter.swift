@@ -45,6 +45,13 @@ final class ClaudeAdapter {
     private var cache: [String: (stamp: String, info: TailInfo)] = [:]
     private let lock = NSLock()
 
+    private struct TokenCacheEntry {
+        var offset: Int
+        var total: Int
+    }
+    private var tokenCache: [String: TokenCacheEntry] = [:]
+    private let tokenLock = NSLock()
+
     private var sessionsDirectory: URL { home.appendingPathComponent(".claude/sessions") }
     private var projectsDirectory: URL { home.appendingPathComponent(".claude/projects") }
 
@@ -61,6 +68,7 @@ final class ClaudeAdapter {
 
             let modified = FileTail.modificationDate(transcript) ?? Date()
             let info = tailInfo(for: transcript, modified: modified)
+            let tokens = tokenUsage(for: transcript)
             let deadFor = Date().timeIntervalSince(modified)
 
             // 判断进程是否还在：pid 存活 + 命令行确实是 claude（防止 pid 复用误判）
@@ -88,6 +96,7 @@ final class ClaudeAdapter {
                 detail: detail,
                 updatedAt: modified,
                 startedAt: executionStartDate(info: info, meta: meta),
+                tokens: tokens,
                 pid: meta.pid,
                 sourcePath: transcript.path,
                 isHistorical: !alive
@@ -275,6 +284,63 @@ final class ClaudeAdapter {
         cache[url.path] = (stamp, info)
         lock.unlock()
         return info
+    }
+
+    /// 增量统计会话累计 token：只累加 input / cache_creation / output，不含 cache_read
+    private func tokenUsage(for url: URL) -> Int? {
+        let size = FileTail.fileSize(url)
+
+        tokenLock.lock()
+        var cached = tokenCache[url.path]
+        if let entry = cached, size < entry.offset {
+            cached = nil
+        }
+        let start = cached?.offset ?? 0
+        let base = cached?.total ?? 0
+        tokenLock.unlock()
+
+        guard size > start,
+              let handle = try? FileHandle(forReadingFrom: url) else { return base }
+        defer { try? handle.close() }
+
+        do {
+            try handle.seek(toOffset: UInt64(start))
+            guard let data = try handle.read(upToCount: size - start), !data.isEmpty else {
+                return base
+            }
+
+            var total = base
+            var lineStart = data.startIndex
+            while let newline = data[lineStart...].firstIndex(of: 10) {
+                let line = data[lineStart..<newline]
+                if !line.isEmpty,
+                   let object = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                   object["type"] as? String == "assistant",
+                   let message = object["message"] as? [String: Any],
+                   let usage = message["usage"] as? [String: Any] {
+                    total += intValue(usage["input_tokens"])
+                        + intValue(usage["cache_creation_input_tokens"])
+                        + intValue(usage["output_tokens"])
+                }
+                lineStart = data.index(after: newline)
+            }
+
+            let consumed = data.distance(from: data.startIndex, to: lineStart)
+            if consumed > 0 {
+                tokenLock.lock()
+                tokenCache[url.path] = TokenCacheEntry(offset: start + consumed, total: total)
+                tokenLock.unlock()
+            }
+            return total
+        } catch {
+            return base
+        }
+    }
+
+    private func intValue(_ value: Any?) -> Int {
+        if let number = value as? NSNumber { return number.intValue }
+        if let text = value as? String { return Int(text) ?? 0 }
+        return 0
     }
 
     /// 向上扩大窗口，找最近一条真实用户消息及其时间

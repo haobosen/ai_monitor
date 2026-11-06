@@ -57,6 +57,7 @@ if arguments.contains("--dump") {
         ]
         if let pid = task.pid { dict["pid"] = pid }
         if let startedAt = task.startedAt { dict["startedAt"] = formatter.string(from: startedAt) }
+        if let tokens = task.tokens { dict["tokens"] = tokens }
         if let source = task.sourcePath { dict["source"] = source }
         return dict
     }

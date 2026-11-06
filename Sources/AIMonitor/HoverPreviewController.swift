@@ -79,6 +79,8 @@ final class HoverPreviewController {
     private static func signature(for tasks: [AITask]) -> String {
         tasks.map {
             "\($0.id)\u{1F}\($0.status.rawValue)\u{1F}\($0.title)\u{1F}\($0.project)"
+                + "\u{1F}\($0.tokens.map(String.init) ?? "-")\u{1F}\($0.startedAt?.timeIntervalSince1970 ?? 0)"
+                + "\u{1F}\($0.status.isActive ? 0 : $0.updatedAt.timeIntervalSince1970)"
         }.joined(separator: "\n")
     }
 
@@ -312,7 +314,10 @@ struct TaskHoverPreview: View {
                         Text(task.projectName)
                             .lineLimit(1)
                         Text("·")
-                        Text(RelativeTime.string(now.timeIntervalSince(task.updatedAt)))
+                        Text(TokenFormat.label(task.tokens))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     .font(.system(size: 9))
                     .foregroundStyle(Theme.inkTertiary)

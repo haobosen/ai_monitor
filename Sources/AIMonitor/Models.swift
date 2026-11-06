@@ -63,6 +63,8 @@ struct AITask: Identifiable, Equatable {
     var updatedAt: Date
     /// 当前任务/最近一轮开始执行的时间
     var startedAt: Date?
+    /// 会话累计 token 使用量（不含缓存读取）
+    var tokens: Int?
     var pid: Int32?
     var sourcePath: String?
     /// 进程已结束、仅作为历史记录展示
@@ -88,6 +90,25 @@ struct AITask: Identifiable, Equatable {
         let home = NSHomeDirectory()
         if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
         return path
+    }
+}
+
+// MARK: - Token 格式化
+
+enum TokenFormat {
+    static func label(_ count: Int?) -> String {
+        guard let count else { return "—" }
+        return "\(short(count)) tokens"
+    }
+
+    static func short(_ count: Int) -> String {
+        if count < 1_000 {
+            return "\(count)"
+        }
+        if count < 1_000_000 {
+            return String(format: "%.1fK", Double(count) / 1_000)
+        }
+        return String(format: "%.2fM", Double(count) / 1_000_000)
     }
 }
 

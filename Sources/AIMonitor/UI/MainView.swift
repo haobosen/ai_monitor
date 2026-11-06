@@ -4,6 +4,7 @@ import AppKit
 /// 主界面：完整任务列表（原浮窗内容迁到这里）
 struct MainView: View {
     @ObservedObject var store: TaskStore
+    @ObservedObject private var ledger = TokenLedger.shared
     let onRefresh: () -> Void
     let onSettings: () -> Void
 
@@ -27,7 +28,7 @@ struct MainView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            SummaryBar(counts: store.counts, tokens: store.totalTokens)
+            SummaryBar(counts: store.counts, todayTokens: ledger.todayTokens, historyTokens: ledger.historyTokens)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(

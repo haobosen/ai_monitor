@@ -77,6 +77,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engine.onUpdate = { [weak self] tasks in
             guard let self else { return }
             self.store.apply(tasks)
+            if !self.isSnapshotMode {
+                TokenLedger.shared.record(tasks: self.store.tasks)
+            }
             self.menuBarController.refreshIcon()
 
             let newlyCompleted = self.notifier.process(tasks)

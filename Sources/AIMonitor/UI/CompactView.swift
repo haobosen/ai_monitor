@@ -6,6 +6,7 @@ struct CompactView: View {
     @ObservedObject var store: TaskStore
     @ObservedObject var actions: PanelActions
     @ObservedObject private var config = AppConfig.shared
+    @ObservedObject private var ledger = TokenLedger.shared
 
     private var rows: [CompactRowModel] {
         CompactRows.models(tasks: store.tasks, enabled: config.enabledProviders)
@@ -52,12 +53,15 @@ struct CompactView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
-            Text("Σ \(TokenFormat.short(store.totalTokens))")
-                .font(.system(size: 8.5, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color.black.opacity(0.42))
-                .fixedSize(horizontal: true, vertical: false)
-                .help("全部 AI 累计 Token 使用量（不含缓存读取）")
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("今日 \(TokenFormat.short(ledger.todayTokens))")
+                Text("历史 \(TokenFormat.short(ledger.historyTokens))")
+            }
+            .font(.system(size: 7.5, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(Color.black.opacity(0.42))
+            .fixedSize(horizontal: true, vertical: false)
+            .help("今日：本地时间 0 点起；历史：启用统计以来的总用量（均不含缓存读取）")
 
             Button { actions.openMain(nil) } label: {
                 Image(systemName: "arrow.up.right.square")

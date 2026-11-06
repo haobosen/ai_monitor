@@ -27,7 +27,7 @@ struct MainView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            SummaryBar(counts: store.counts)
+            SummaryBar(counts: store.counts, tokens: store.totalTokens)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(

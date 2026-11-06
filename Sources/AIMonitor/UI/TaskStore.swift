@@ -15,6 +15,11 @@ final class TaskStore: ObservableObject {
 
     var counts: TaskCounts { TaskCounts(tasks: tasks) }
 
+    /// 当前展示的所有 AI 任务累计 Token（不含缓存读取）
+    var totalTokens: Int {
+        tasks.reduce(0) { $0 + ($1.tokens ?? 0) }
+    }
+
     var groups: [TaskGroup] {
         var order: [String] = []
         var buckets: [String: [AITask]] = [:]

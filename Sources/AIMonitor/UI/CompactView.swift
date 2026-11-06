@@ -52,6 +52,13 @@ struct CompactView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
 
+            Text("Σ \(TokenFormat.short(store.totalTokens))")
+                .font(.system(size: 8.5, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.black.opacity(0.42))
+                .fixedSize(horizontal: true, vertical: false)
+                .help("全部 AI 累计 Token 使用量（不含缓存读取）")
+
             Button { actions.openMain(nil) } label: {
                 Image(systemName: "arrow.up.right.square")
                     .font(.system(size: 8.5, weight: .semibold))

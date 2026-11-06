@@ -174,6 +174,7 @@ struct GroupHeader: View {
 
 struct SummaryBar: View {
     let counts: TaskCounts
+    let tokens: Int
 
     var body: some View {
         HStack(spacing: 8) {
@@ -182,7 +183,28 @@ struct SummaryBar: View {
             chip(counts.failed, "失败", Theme.failed)
             chip(counts.completed, "已完成", Theme.completed)
             Spacer(minLength: 0)
+            tokenChip(tokens)
         }
+    }
+
+    private func tokenChip(_ total: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+            Text("Token 总量")
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(Theme.inkSecondary)
+            Text(TokenFormat.short(total))
+                .font(.system(size: 10, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(Theme.accent)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Theme.accent.opacity(0.07)))
+        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.18), lineWidth: 0.8))
+        .help("全部 AI 累计 Token 使用量（不含缓存读取）")
     }
 
     private func chip(_ value: Int, _ label: String, _ color: Color) -> some View {
